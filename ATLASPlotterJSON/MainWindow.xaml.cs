@@ -41,13 +41,13 @@ namespace ATLASPlotterJSON
         // CORE IMAGE AND DATA PROPERTIES
         /// <summary>The loaded sprite atlas image</summary>
         private BitmapImage? loadedImage;
-        
+
         /// <summary>Legacy collection for atlas items (mostly replaced by SpriteCollection)</summary>
         private readonly List<AtlasItem> atlasItems = new();
-        
+
         /// <summary>Path to the currently loaded image file</summary>
         private string? imagePath;
-        
+
         /// <summary>
         /// Dictionary mapping sprite IDs to their visual markers on the canvas
         /// This allows quick lookup of markers when sprites need to be updated
@@ -60,32 +60,22 @@ namespace ATLASPlotterJSON
         /// Created by InitializePixelLocationDisplay() when an image is loaded
         /// </summary>
         private PixelLocationDisplay? pixelLocationDisplay;
-        
+
         /// <summary>True when actively tracking mouse movement for pixel selection</summary>
         private bool isTrackingPixel = false;
-        
+
         /// <summary>The current pixel location being tracked</summary>
         private Point currentPixelLocation;
 
-        // ZOOM RELATED PROPERTIES
-        /// <summary>Current zoom level of the canvas (1.0 = 100%)</summary>
-        private double currentZoom = 1.0;
-        
-        /// <summary>How much to change zoom with each zoom operation (25%)</summary>
-        private const double ZoomIncrement = 0.25;
-        
-        /// <summary>Minimum allowed zoom level (25%)</summary>
-        private const double MinZoom = 0.25;
-        
-        /// <summary>Maximum allowed zoom level (800%)</summary>
-        private const double MaxZoom = 8.0;
+        /// <summary>
+        /// Gets the loaded sprite atlas image
+        /// </summary>
+        public BitmapImage? LoadedImage => loadedImage;
 
         /// <summary>
-        /// Public accessor for current zoom level
-        /// Other components like PixelLocationDisplay and SpriteItemMarker
-        /// use this to adjust their visual appearance at different zoom levels
+        /// Gets the image control that displays the loaded image
         /// </summary>
-        public double CurrentZoom => currentZoom;
+        public Image DisplayImage => displayImage;
 
         /// <summary>
         /// Initialize the main application window
@@ -94,9 +84,6 @@ namespace ATLASPlotterJSON
         {
             // Initialize the WPF components defined in XAML
             InitializeComponent();
-            
-            // Set initial zoom display text
-            UpdateZoomDisplay();
 
             // COMPONENT CONNECTION:
             // Connect to JsonDataEntryControl events to stay synchronized
@@ -104,6 +91,9 @@ namespace ATLASPlotterJSON
             jsonDataEntry.SelectedSpriteChanged += OnSelectedSpriteChanged;
             jsonDataEntry.SpriteAdded += OnSpriteAdded;
             jsonDataEntry.SpriteRemoved += OnSpriteRemoved;
+
+            // Subscribe to the window size changed event
+            SizeChanged += Window_SizeChanged;
         }
 
         /// <summary>
@@ -126,25 +116,22 @@ namespace ATLASPlotterJSON
                 {
                     // Store the selected image path
                     imagePath = openFileDialog.FileName;
-                    
+
                     // APPLICATION FLOW:
                     // 1. Load the image into the canvas
                     LoadImage(imagePath);
-                    
+
                     // 2. Clear any existing sprite selections
                     ClearSelections();
-                    
+
                     // 3. Enable the UI buttons for saving and clearing
                     btnSaveAtlas.IsEnabled = true;
                     btnClearSelections.IsEnabled = true;
-                    
-                    // 4. Reset zoom to 100%
-                    ResetZoom();
 
-                    // 5. Create the pixel location tracker for precise positioning
+                    // 4. Create the pixel location tracker for precise positioning
                     InitializePixelLocationDisplay();
 
-                    // 6. Create visual markers for any sprites already in the collection
+                    // 5. Create visual markers for any sprites already in the collection
                     CreateMarkersForExistingSprites();
                 }
                 catch (Exception ex)
@@ -170,14 +157,12 @@ namespace ATLASPlotterJSON
             // COMPONENT CONNECTION:
             // Apply the loaded image to the Image control in the XAML
             displayImage.Source = loadedImage;
-            
-            // Size the canvas to match the image dimensions
-            // This ensures the canvas is exactly the size of the sprite atlas
-            imageCanvas.Width = loadedImage.Width;
-            imageCanvas.Height = loadedImage.Height;
 
             // Update window title to show which image is loaded
             Title = $"Atlas Plotter - {System.IO.Path.GetFileName(path)}";
+
+            // Update the scaling to fit the image in the available space
+            UpdateImageScaling();
         }
 
         /// <summary>
@@ -248,7 +233,7 @@ namespace ATLASPlotterJSON
 
             // Create a new visual marker for this sprite
             var marker = new SpriteItemMarker(sprite, markerColor);
-            
+
             // COMPONENT CONNECTION:
             // Subscribe to the marker's selection event
             // When a user clicks the marker, this event will fire
@@ -261,8 +246,8 @@ namespace ATLASPlotterJSON
             // Update the marker's appearance based on whether it's selected
             marker.UpdateAppearance(sprite == jsonDataEntry.SpriteCollection.SelectedItem);
 
-            // Update the marker's position based on the current zoom level
-            marker.UpdatePosition(currentZoom);
+            // Update the marker's position
+            marker.UpdatePosition();
         }
 
         /// <summary>
@@ -329,17 +314,31 @@ namespace ATLASPlotterJSON
 
         /// <summary>
         /// Converts a mouse position to precise pixel coordinates
-        /// Accounts for zoom level and ensures coordinates are whole numbers
+        /// Accounts for image scaling and ensures coordinates are whole numbers
         /// </summary>
         /// <param name="point">The raw mouse position</param>
         /// <returns>The corresponding pixel coordinates on the sprite atlas</returns>
         public Point SnapToPixel(Point point)
         {
-            // Convert mouse position from zoomed canvas coordinates to original image coordinates
-            point.X /= currentZoom;
-            point.Y /= currentZoom;
-            // Use Math.Floor to ensure we get whole pixel values
-            return new Point(Math.Floor(point.X), Math.Floor(point.Y));
+            if (loadedImage == null) return point;
+
+            // Calculate the offset from the edge of the canvas to the image
+            double offsetX = Canvas.GetLeft(displayImage);
+            double offsetY = Canvas.GetTop(displayImage);
+
+            // Convert from mouse position to image coordinates
+            double scaleX = loadedImage.Width / displayImage.Width;
+            double scaleY = loadedImage.Height / displayImage.Height;
+
+            // Adjust for the image position within the canvas
+            double imageX = (point.X - offsetX) * scaleX;
+            double imageY = (point.Y - offsetY) * scaleY;
+
+            // Use Math.Floor to ensure we get whole pixel values and constrain to image bounds
+            imageX = Math.Floor(Math.Max(0, Math.Min(imageX, loadedImage.Width - 1)));
+            imageY = Math.Floor(Math.Max(0, Math.Min(imageY, loadedImage.Height - 1)));
+
+            return new Point(imageX, imageY);
         }
 
         /// <summary>
@@ -360,7 +359,7 @@ namespace ATLASPlotterJSON
             // Update and show the pixel location display
             if (pixelLocationDisplay != null)
             {
-                pixelLocationDisplay.UpdatePosition(currentPixelLocation, currentZoom);
+                pixelLocationDisplay.UpdatePosition(currentPixelLocation);
                 pixelLocationDisplay.Show();
 
                 // COMPONENT CONNECTION:
@@ -399,14 +398,14 @@ namespace ATLASPlotterJSON
                 // BOUNDARY CHECKING:
                 // Keep the pixel location within the bounds of the image
                 // This prevents selecting pixels outside the sprite atlas
-                currentPixelLocation.X = Math.Max(0, Math.Min(currentPixelLocation.X, imageCanvas.Width / currentZoom - 1));
-                currentPixelLocation.Y = Math.Max(0, Math.Min(currentPixelLocation.Y, imageCanvas.Height / currentZoom - 1));
+                currentPixelLocation.X = Math.Max(0, Math.Min(currentPixelLocation.X, loadedImage.Width - 1));
+                currentPixelLocation.Y = Math.Max(0, Math.Min(currentPixelLocation.Y, loadedImage.Height - 1));
 
                 // COMPONENT CONNECTION:
                 // Update the pixel location display with new coordinates
                 if (pixelLocationDisplay != null)
                 {
-                    pixelLocationDisplay.UpdatePosition(currentPixelLocation, currentZoom);
+                    pixelLocationDisplay.UpdatePosition(currentPixelLocation);
 
                     // COMPONENT CONNECTION:
                     // Update the selected sprite's position in the JsonDataEntryControl
@@ -427,12 +426,12 @@ namespace ATLASPlotterJSON
             // COMPONENT CONNECTION:
             // Get the currently selected sprite from JsonDataEntryControl
             var selectedSprite = jsonDataEntry.SpriteCollection.SelectedItem;
-            
+
             // If there's a selected sprite and we have a marker for it
             if (selectedSprite != null && spriteMarkers.TryGetValue(selectedSprite.Id, out var marker))
             {
-                // Update the marker's position based on the current zoom level
-                marker.UpdatePosition(currentZoom);
+                // Update the marker's position
+                marker.UpdatePosition();
             }
         }
 
@@ -515,11 +514,11 @@ namespace ATLASPlotterJSON
                     {
                         WriteIndented = true
                     };
-                    
+
                     // COMPONENT CONNECTION:
                     // Serialize the entire sprite collection from JsonDataEntryControl
                     string json = JsonSerializer.Serialize(jsonDataEntry.SpriteCollection, options);
-                    
+
                     // Write the JSON to the selected file
                     File.WriteAllText(saveFileDialog.FileName, json);
 
@@ -598,115 +597,61 @@ namespace ATLASPlotterJSON
             }
         }
 
-        #region Zoom Functionality
-
         /// <summary>
-        /// Event handler for the "Zoom In" button click
-        /// Increases zoom by one increment
+        /// Event handler for the window size changed event
+        /// Updates the image and UI elements to fill available space
         /// </summary>
-        private void btnZoomIn_Click(object sender, RoutedEventArgs e)
+        private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            ApplyZoom(currentZoom + ZoomIncrement);
+            // Only proceed if an image is loaded
+            if (loadedImage != null)
+            {
+                UpdateImageScaling();
+            }
         }
 
         /// <summary>
-        /// Event handler for the "Zoom Out" button click
-        /// Decreases zoom by one increment
+        /// Updates the image scaling to fill the available space
+        /// and repositions all UI elements accordingly
         /// </summary>
-        private void btnZoomOut_Click(object sender, RoutedEventArgs e)
+        private void UpdateImageScaling()
         {
-            ApplyZoom(currentZoom - ZoomIncrement);
-        }
+            if (loadedImage == null) return;
 
-        /// <summary>
-        /// Event handler for the "Reset Zoom" button click
-        /// Returns zoom to 100%
-        /// </summary>
-        private void btnZoomReset_Click(object sender, RoutedEventArgs e)
-        {
-            ResetZoom();
-        }
+            // Get a reference to the main Grid that's defined in the XAML
+            var mainGrid = (Grid)Content;
 
-        /// <summary>
-        /// Resets the zoom to 100% (1.0)
-        /// </summary>
-        private void ResetZoom()
-        {
-            ApplyZoom(1.0);
-        }
+            // Calculate the available display area (accounting for margins)
+            double availableWidth = (mainGrid.ColumnDefinitions[0].ActualWidth - 20);
+            double availableHeight = (mainGrid.RowDefinitions[1].ActualHeight - 20);
 
-        /// <summary>
-        /// Applies a specific zoom level to the canvas
-        /// Updates all UI elements to reflect the new zoom
-        /// </summary>
-        /// <param name="zoom">The zoom level to apply (1.0 = 100%)</param>
-        private void ApplyZoom(double zoom)
-        {
-            // BOUNDARY CHECKING:
-            // Ensure zoom level stays within defined limits
-            zoom = Math.Max(MinZoom, Math.Min(MaxZoom, zoom));
+            // Calculate the scaling factor to fit the image in the available space
+            double scaleX = availableWidth / loadedImage.Width;
+            double scaleY = availableHeight / loadedImage.Height;
+            double scale = Math.Min(scaleX, scaleY);
 
-            // Apply the zoom level to our tracked value
-            currentZoom = zoom;
-            
-            // COMPONENT CONNECTION:
-            // Apply zoom to the ScaleTransform in XAML that scales the canvas
-            zoomTransform.ScaleX = zoom;
-            zoomTransform.ScaleY = zoom;
+            // Set the canvas and image dimensions
+            imageCanvas.Width = availableWidth;
+            imageCanvas.Height = availableHeight;
+            displayImage.Width = loadedImage.Width * scale;
+            displayImage.Height = loadedImage.Height * scale;
 
-            // Update zoom level display in UI
-            UpdateZoomDisplay();
+            // Center the image in the available space
+            Canvas.SetLeft(displayImage, (availableWidth - displayImage.Width) / 2);
+            Canvas.SetTop(displayImage, (availableHeight - displayImage.Height) / 2);
 
-            // COMPONENT CONNECTION:
-            // Update pixel location display if visible
-            // This ensures the display is correctly positioned at the new zoom level
+            // Update the pixel location display and sprite markers
             if (pixelLocationDisplay != null && pixelLocationDisplay.Visibility == Visibility.Visible)
             {
-                pixelLocationDisplay.UpdatePosition(pixelLocationDisplay.CurrentLocation, currentZoom);
+                pixelLocationDisplay.UpdatePosition(pixelLocationDisplay.CurrentLocation);
             }
 
-            // COMPONENT CONNECTION:
-            // Update all sprite markers with new zoom level
-            // This ensures markers are correctly sized and positioned
+            // Update all sprite markers
             foreach (var marker in spriteMarkers.Values)
             {
-                marker.UpdatePosition(currentZoom);
+                marker.UpdatePosition();
             }
         }
-
-        /// <summary>
-        /// Updates the zoom level text display in the UI
-        /// </summary>
-        private void UpdateZoomDisplay()
-        {
-            txtZoomLevel.Text = $"{currentZoom * 100:0}%";
-        }
-
-        /// <summary>
-        /// Event handler for mouse wheel movement on the ScrollViewer
-        /// Enables zooming with Ctrl+Mouse Wheel
-        /// </summary>
-        private void scrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
-        {
-            // Check if Ctrl key is held while scrolling
-            if (Keyboard.Modifiers == ModifierKeys.Control)
-            {
-                // USER EXPERIENCE ENHANCEMENT:
-                // Calculate zoom factor based on wheel direction
-                // Scrolling up zooms in, scrolling down zooms out
-                double zoomFactor = e.Delta > 0 ? ZoomIncrement : -ZoomIncrement;
-                double newZoom = Math.Max(MinZoom, Math.Min(MaxZoom, currentZoom + zoomFactor));
-
-                // Apply the zoom
-                ApplyZoom(newZoom);
-
-                // Prevent the ScrollViewer from scrolling vertically
-                // We want to zoom, not scroll, when Ctrl is pressed
-                e.Handled = true;
-            }
-        }
-        
-        #endregion
     }
 
     /// <summary>
@@ -718,16 +663,16 @@ namespace ATLASPlotterJSON
     {
         /// <summary>Name of the sprite</summary>
         public string Name { get; set; } = string.Empty;
-        
+
         /// <summary>X position within the atlas</summary>
         public int X { get; set; }
-        
+
         /// <summary>Y position within the atlas</summary>
         public int Y { get; set; }
-        
+
         /// <summary>Width of the sprite in pixels</summary>
         public int Width { get; set; }
-        
+
         /// <summary>Height of the sprite in pixels</summary>
         public int Height { get; set; }
     }
@@ -741,13 +686,13 @@ namespace ATLASPlotterJSON
     {
         /// <summary>Path to the atlas image file</summary>
         public string ImagePath { get; set; } = string.Empty;
-        
+
         /// <summary>Width of the atlas image in pixels</summary>
         public int ImageWidth { get; set; }
-        
+
         /// <summary>Height of the atlas image in pixels</summary>
         public int ImageHeight { get; set; }
-        
+
         /// <summary>Collection of sprite frames defined in the atlas</summary>
         public List<AtlasItem> Frames { get; set; } = new List<AtlasItem>();
     }

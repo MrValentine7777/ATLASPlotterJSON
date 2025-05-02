@@ -146,38 +146,48 @@ namespace ATLASPlotterJSON
         /// <summary>
         /// Updates the position and size of the marker to match the sprite data
         /// </summary>
-        /// <param name="zoomLevel">Current zoom level of the canvas (default is 1.0)</param>
-        /// <remarks>
-        /// Called when:
-        /// 1. The sprite position or size changes in the JsonDataEntryControl
-        /// 2. The user moves the sprite by clicking on the canvas
-        /// 3. The zoom level changes
-        /// </remarks>
-        public void UpdatePosition(double zoomLevel = 1.0)
+        public void UpdatePosition()
         {
-            // Position and size the source box to match the sprite data
-            // This places the rectangle at the exact position of the sprite in the atlas
-            Canvas.SetLeft(sourceBox, spriteItem.Source.X);
-            Canvas.SetTop(sourceBox, spriteItem.Source.Y);
-            sourceBox.Width = spriteItem.Source.Width;
-            sourceBox.Height = spriteItem.Source.Height;
+            // Get scaling information from the main window
+            double scaleX = 1.0;
+            double scaleY = 1.0;
+            double offsetX = 0;
+            double offsetY = 0;
             
-            // Adjust border thickness for current zoom level
-            // Makes the border appear consistent regardless of zoom
-            sourceBox.StrokeThickness = 2 / zoomLevel;
+            // Find MainWindow instance to get scaling factors
+            MainWindow mainWindow = Window.GetWindow(this) as MainWindow;
+            if (mainWindow?.LoadedImage != null)
+            {
+                var image = mainWindow.DisplayImage;
+                scaleX = image.Width / mainWindow.LoadedImage.Width;
+                scaleY = image.Height / mainWindow.LoadedImage.Height;
+                offsetX = Canvas.GetLeft(image);
+                offsetY = Canvas.GetTop(image);
+            }
+            
+            // Calculate the display position on the scaled canvas
+            double displayX = spriteItem.Source.X * scaleX + offsetX;
+            double displayY = spriteItem.Source.Y * scaleY + offsetY;
+            double displayWidth = spriteItem.Source.Width * scaleX;
+            double displayHeight = spriteItem.Source.Height * scaleY;
+            
+            // Position and size the source box to match the sprite data
+            Canvas.SetLeft(sourceBox, displayX);
+            Canvas.SetTop(sourceBox, displayY);
+            sourceBox.Width = displayWidth;
+            sourceBox.Height = displayHeight;
+            sourceBox.StrokeThickness = 2;
             
             // Update the label text to ensure it's current
             UpdateNameDisplay();
             
             // Position the label at the top-left corner of the box
-            // The label appears just above the sprite rectangle
-            Canvas.SetLeft(label, spriteItem.Source.X);
-            Canvas.SetTop(label, spriteItem.Source.Y - label.ActualHeight - 2);
+            Canvas.SetLeft(label, displayX);
+            Canvas.SetTop(label, displayY - label.ActualHeight - 2);
             
-            // Adjust text for zoom level
-            // Makes text readable at any zoom level
-            label.FontSize = 12 / zoomLevel;
-            label.Padding = new Thickness(4 / zoomLevel);
+            // Keep text at a readable size
+            label.FontSize = 12;
+            label.Padding = new Thickness(4);
         }
         
         /// <summary>

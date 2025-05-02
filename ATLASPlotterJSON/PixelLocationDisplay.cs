@@ -73,35 +73,41 @@ namespace ATLASPlotterJSON
         /// Updates the position of the pixel location display to track a new location
         /// </summary>
         /// <param name="location">The new pixel coordinate to display</param>
-        /// <param name="zoomLevel">Current zoom level of the canvas (affects visual size)</param>
-        public void UpdatePosition(Point location, double zoomLevel = 1.0)
+        public void UpdatePosition(Point location)
         {
             // Store the current location for future reference
             CurrentLocation = location;
             
-            // Position the highlight box centered on the target pixel
-            // Subtract half the box size to center it on the pixel coordinates
-            Canvas.SetLeft(highlightBox, location.X - BoxSize / 2);
-            Canvas.SetTop(highlightBox, location.Y - BoxSize / 2);
+            // Get scaling information from the parent window to calculate proper positioning
+            double scaleX = 1.0;
+            double scaleY = 1.0;
+            double offsetX = 0;
+            double offsetY = 0;
             
-            // Adjust box size and stroke thickness for zoom level
-            // When zoomed in, the box should appear smaller relative to the pixels
-            highlightBox.Width = highlightBox.Height = BoxSize / zoomLevel;
-            highlightBox.StrokeThickness = 2 / zoomLevel;
+            // Get the rendered image dimensions and position
+            if (parentWindow.LoadedImage != null)
+            {
+                var image = parentWindow.DisplayImage;
+                scaleX = image.Width / parentWindow.LoadedImage.Width;
+                scaleY = image.Height / parentWindow.LoadedImage.Height;
+                offsetX = Canvas.GetLeft(image);
+                offsetY = Canvas.GetTop(image);
+            }
+            
+            // Calculate the display position on the scaled canvas
+            double displayX = location.X * scaleX + offsetX;
+            double displayY = location.Y * scaleY + offsetY;
+            
+            // Position the highlight box centered on the target pixel
+            Canvas.SetLeft(highlightBox, displayX - BoxSize / 2);
+            Canvas.SetTop(highlightBox, displayY - BoxSize / 2);
             
             // Update the text to show current X,Y coordinates
-            // Cast to integer since we're working with discrete pixels
             coordsText.Text = $"X: {(int)location.X}, Y: {(int)location.Y}";
             
-            // Position the text near the highlight box but ensure it's visible
-            // The text is positioned to the right and above the highlight box
-            Canvas.SetLeft(coordsText, location.X + (BoxSize / zoomLevel));
-            Canvas.SetTop(coordsText, location.Y - coordsText.ActualHeight - (BoxSize / zoomLevel) - (VerticalOffset / zoomLevel));
-            
-            // Adjust text size and padding for current zoom level
-            // This ensures the text remains readable at all zoom levels
-            coordsText.FontSize = 12 / zoomLevel;
-            coordsText.Padding = new Thickness(4 / zoomLevel);
+            // Position the text near the highlight box
+            Canvas.SetLeft(coordsText, displayX + BoxSize);
+            Canvas.SetTop(coordsText, displayY - coordsText.ActualHeight - BoxSize - VerticalOffset);
         }
         
         /// <summary>

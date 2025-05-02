@@ -6,7 +6,8 @@
         xmlns:local="clr-namespace:ATLASPlotterJSON"
         mc:Ignorable="d"
         Title="Atlas Plotter" Height="600" Width="1100"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        SizeChanged="Window_SizeChanged">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -24,28 +25,17 @@
             <Button x:Name="btnLoadImage" Content="Load Image" Padding="8,3" Margin="0,0,10,0" Click="btnLoadImage_Click"/>
             <Button x:Name="btnSaveAtlas" Content="Save Atlas JSON" Padding="8,3" Margin="0,0,10,0" Click="btnSaveAtlas_Click" IsEnabled="False"/>
             <Button x:Name="btnClearSelections" Content="Clear All" Padding="8,3" Margin="0,0,10,0" Click="btnClearSelections_Click" IsEnabled="False"/>
-            <Separator Width="15" Opacity="0"/>
-            <Button x:Name="btnZoomOut" Content="-" Padding="8,3" Width="25" Click="btnZoomOut_Click"/>
-            <TextBlock x:Name="txtZoomLevel" Text="100%" Width="60" VerticalAlignment="Center" TextAlignment="Center"/>
-            <Button x:Name="btnZoomIn" Content="+" Padding="8,3" Width="25" Click="btnZoomIn_Click"/>
-            <Button x:Name="btnZoomReset" Content="Reset Zoom" Padding="8,3" Margin="5,0,0,0" Click="btnZoomReset_Click"/>
         </StackPanel>
 
         <!-- Image Display Area -->
         <Border Grid.Row="1" Grid.Column="0" BorderBrush="Gray" BorderThickness="1" Margin="10" Background="#FFE5E5E5">
-            <ScrollViewer x:Name="scrollViewer" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
-                          PreviewMouseWheel="scrollViewer_PreviewMouseWheel">
-                <Canvas x:Name="imageCanvas" Background="Transparent" 
-                        MouseLeftButtonDown="imageCanvas_MouseLeftButtonDown" 
-                        MouseMove="imageCanvas_MouseMove"
-                        MouseLeftButtonUp="imageCanvas_MouseLeftButtonUp">
-                    <Canvas.RenderTransform>
-                        <ScaleTransform x:Name="zoomTransform" ScaleX="1" ScaleY="1" />
-                    </Canvas.RenderTransform>
-                    <Image x:Name="displayImage" RenderOptions.BitmapScalingMode="NearestNeighbor" 
-                           RenderOptions.EdgeMode="Aliased" Stretch="None"/>
-                </Canvas>
-            </ScrollViewer>
+            <Canvas x:Name="imageCanvas" Background="Transparent" 
+                    MouseLeftButtonDown="imageCanvas_MouseLeftButtonDown" 
+                    MouseMove="imageCanvas_MouseMove"
+                    MouseLeftButtonUp="imageCanvas_MouseLeftButtonUp">
+                <Image x:Name="displayImage" RenderOptions.BitmapScalingMode="NearestNeighbor" 
+                       RenderOptions.EdgeMode="Aliased" Stretch="Uniform"/>
+            </Canvas>
         </Border>
 
         <!-- JSON Data Entry Panel -->
