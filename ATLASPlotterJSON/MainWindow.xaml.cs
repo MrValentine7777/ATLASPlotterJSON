@@ -22,11 +22,13 @@ namespace ATLASPlotterJSON
     {
         private BitmapImage? loadedImage;
         private readonly List<AtlasItem> atlasItems = new();
-        private Rectangle? selectionRect;
-        private Point startPoint;
-        private bool isDrawing;
         private string? imagePath;
-        private readonly List<SelectionHandle> selectionHandles = new();
+        private Dictionary<int, SpriteItemMarker> spriteMarkers = new Dictionary<int, SpriteItemMarker>();
+
+        // Pixel location tracking
+        private PixelLocationDisplay? pixelLocationDisplay;
+        private bool isTrackingPixel = false;
+        private Point currentPixelLocation;
 
         // Zoom related properties
         private double currentZoom = 1.0;
@@ -34,13 +36,18 @@ namespace ATLASPlotterJSON
         private const double MinZoom = 0.25;
         private const double MaxZoom = 8.0;
 
-        // Make currentZoom public so handles can access it
+        // Make currentZoom public so displays can access it
         public double CurrentZoom => currentZoom;
 
         public MainWindow()
         {
             InitializeComponent();
             UpdateZoomDisplay();
+
+            // Subscribe to sprite collection events
+            jsonDataEntry.SelectedSpriteChanged += OnSelectedSpriteChanged;
+            jsonDataEntry.SpriteAdded += OnSpriteAdded;
+            jsonDataEntry.SpriteRemoved += OnSpriteRemoved;
         }
 
         private void btnLoadImage_Click(object sender, RoutedEventArgs e)
@@ -61,6 +68,12 @@ namespace ATLASPlotterJSON
                     btnSaveAtlas.IsEnabled = true;
                     btnClearSelections.IsEnabled = true;
                     ResetZoom();
+
+                    // Initialize pixel location display after image is loaded
+                    InitializePixelLocationDisplay();
+
+                    // Create markers for any existing sprite items
+                    CreateMarkersForExistingSprites();
                 }
                 catch (Exception ex)
                 {
@@ -84,6 +97,95 @@ namespace ATLASPlotterJSON
             Title = $"Atlas Plotter - {System.IO.Path.GetFileName(path)}";
         }
 
+        private void InitializePixelLocationDisplay()
+        {
+            // Remove existing display if any
+            if (pixelLocationDisplay != null)
+            {
+                imageCanvas.Children.Remove(pixelLocationDisplay);
+            }
+
+            // Create new pixel location display
+            pixelLocationDisplay = new PixelLocationDisplay(this);
+            imageCanvas.Children.Add(pixelLocationDisplay);
+            pixelLocationDisplay.Hide(); // Initially hidden
+        }
+
+        private void CreateMarkersForExistingSprites()
+        {
+            // Clear existing markers first
+            ClearSpriteMarkers();
+
+            // Create markers for each sprite in the collection
+            foreach (var sprite in jsonDataEntry.SpriteCollection.Items)
+            {
+                CreateSpriteMarker(sprite);
+            }
+        }
+
+        private void ClearSpriteMarkers()
+        {
+            foreach (var marker in spriteMarkers.Values)
+            {
+                imageCanvas.Children.Remove(marker);
+            }
+            spriteMarkers.Clear();
+        }
+
+        private void CreateSpriteMarker(SpriteItem sprite)
+        {
+            if (loadedImage == null) return;
+
+            // Get the color for this sprite
+            Color markerColor = jsonDataEntry.SpriteCollection.GetItemColor(sprite.Id);
+
+            // Create a new marker
+            var marker = new SpriteItemMarker(sprite, markerColor);
+            marker.MarkerSelected += Marker_Selected;
+
+            // Add it to the canvas and dictionary
+            imageCanvas.Children.Add(marker);
+            spriteMarkers[sprite.Id] = marker;
+
+            // Update its appearance based on whether it's selected
+            marker.UpdateAppearance(sprite == jsonDataEntry.SpriteCollection.SelectedItem);
+
+            // Update marker position with current zoom
+            marker.UpdatePosition(currentZoom);
+        }
+
+        private void Marker_Selected(object sender, SpriteItem sprite)
+        {
+            // Update the selected sprite in the collection
+            jsonDataEntry.SpriteCollection.SelectedItem = sprite;
+        }
+
+        private void OnSelectedSpriteChanged(object sender, SpriteItem sprite)
+        {
+            // Update the appearance of all markers
+            foreach (var marker in spriteMarkers.Values)
+            {
+                marker.UpdateAppearance(marker.SpriteItem == sprite);
+            }
+        }
+
+        private void OnSpriteAdded(object sender, SpriteItem sprite)
+        {
+            if (loadedImage != null)
+            {
+                CreateSpriteMarker(sprite);
+            }
+        }
+
+        private void OnSpriteRemoved(object sender, SpriteItem sprite)
+        {
+            if (spriteMarkers.TryGetValue(sprite.Id, out var marker))
+            {
+                imageCanvas.Children.Remove(marker);
+                spriteMarkers.Remove(sprite.Id);
+            }
+        }
+
         public Point SnapToPixel(Point point)
         {
             // Convert mouse position from transformed canvas coordinates to original coordinates
@@ -96,174 +198,105 @@ namespace ATLASPlotterJSON
         {
             if (loadedImage == null) return;
 
-            // Clear previous selection handles
-            ClearHandles();
+            currentPixelLocation = SnapToPixel(e.GetPosition(imageCanvas));
 
-            startPoint = SnapToPixel(e.GetPosition(imageCanvas));
-            selectionRect = new Rectangle
+            // Begin pixel tracking
+            isTrackingPixel = true;
+
+            // Show and update pixel location display
+            if (pixelLocationDisplay != null)
             {
-                Stroke = Brushes.LimeGreen,
-                StrokeThickness = 2 / currentZoom, // Adjust stroke thickness for zoom level
-                Fill = new SolidColorBrush(Color.FromArgb(50, 0, 255, 0))
-            };
+                pixelLocationDisplay.UpdatePosition(currentPixelLocation, currentZoom);
+                pixelLocationDisplay.Show();
 
-            Canvas.SetLeft(selectionRect, startPoint.X);
-            Canvas.SetTop(selectionRect, startPoint.Y);
-            imageCanvas.Children.Add(selectionRect);
+                // Update JSON data source with current location
+                jsonDataEntry.SetCurrentLocation(currentPixelLocation);
 
-            isDrawing = true;
-            btnAddSelection.IsEnabled = true;
+                // Update the marker position for the selected sprite
+                UpdateSelectedSpriteMarker();
+            }
+
+            // Update status display
+            UpdateSelectionStatus(currentPixelLocation.X, currentPixelLocation.Y, 0, 0);
+
             e.Handled = true;
-
-            UpdateSelectionStatus(startPoint.X, startPoint.Y, 0, 0);
         }
 
         private void imageCanvas_MouseMove(object sender, MouseEventArgs e)
         {
-            if (isDrawing && selectionRect != null)
+            if (loadedImage == null) return;
+
+            Point mousePosition = SnapToPixel(e.GetPosition(imageCanvas));
+
+            // Always update status bar with mouse position
+            UpdateSelectionStatus(mousePosition.X, mousePosition.Y, 0, 0);
+
+            if (isTrackingPixel)
             {
-                var currentPoint = SnapToPixel(e.GetPosition(imageCanvas));
+                currentPixelLocation = mousePosition;
 
-                currentPoint.X = Math.Max(0, Math.Min(currentPoint.X, Math.Floor(imageCanvas.Width / currentZoom)));
-                currentPoint.Y = Math.Max(0, Math.Min(currentPoint.Y, Math.Floor(imageCanvas.Height / currentZoom)));
+                // Keep pixel location within image bounds
+                currentPixelLocation.X = Math.Max(0, Math.Min(currentPixelLocation.X, imageCanvas.Width / currentZoom - 1));
+                currentPixelLocation.Y = Math.Max(0, Math.Min(currentPixelLocation.Y, imageCanvas.Height / currentZoom - 1));
 
-                int left = (int)Math.Min(startPoint.X, currentPoint.X);
-                int top = (int)Math.Min(startPoint.Y, currentPoint.Y);
-                int width = (int)Math.Abs(currentPoint.X - startPoint.X);
-                int height = (int)Math.Abs(currentPoint.Y - startPoint.Y);
+                // Update pixel location display
+                if (pixelLocationDisplay != null)
+                {
+                    pixelLocationDisplay.UpdatePosition(currentPixelLocation, currentZoom);
 
-                width = Math.Max(1, width);
-                height = Math.Max(1, height);
+                    // Update JSON data with current location
+                    jsonDataEntry.SetCurrentLocation(currentPixelLocation);
 
-                Canvas.SetLeft(selectionRect, left);
-                Canvas.SetTop(selectionRect, top);
-                selectionRect.Width = width;
-                selectionRect.Height = height;
+                    // Update the marker position for the selected sprite
+                    UpdateSelectedSpriteMarker();
+                }
+            }
+        }
 
-                UpdateSelectionStatus(left, top, width, height);
+        private void UpdateSelectedSpriteMarker()
+        {
+            var selectedSprite = jsonDataEntry.SpriteCollection.SelectedItem;
+            if (selectedSprite != null && spriteMarkers.TryGetValue(selectedSprite.Id, out var marker))
+            {
+                marker.UpdatePosition(currentZoom);
             }
         }
 
         private void imageCanvas_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            if (isDrawing && selectionRect != null)
+            if (isTrackingPixel)
             {
-                isDrawing = false;
-                
-                // Add handles to the selection
-                AddHandlesToSelection(selectionRect);
-            }
-        }
+                isTrackingPixel = false;
 
-        private void AddHandlesToSelection(Rectangle rect)
-        {
-            // Clear any existing handles
-            ClearHandles();
-            
-            // Create handles for each corner
-            var topLeft = new SelectionHandle(HandlePosition.TopLeft, rect, this);
-            var topRight = new SelectionHandle(HandlePosition.TopRight, rect, this);
-            var bottomLeft = new SelectionHandle(HandlePosition.BottomLeft, rect, this);
-            var bottomRight = new SelectionHandle(HandlePosition.BottomRight, rect, this);
-            
-            // Add handles to the canvas
-            imageCanvas.Children.Add(topLeft);
-            imageCanvas.Children.Add(topRight);
-            imageCanvas.Children.Add(bottomLeft);
-            imageCanvas.Children.Add(bottomRight);
-            
-            // Store handles for later reference
-            selectionHandles.Add(topLeft);
-            selectionHandles.Add(topRight);
-            selectionHandles.Add(bottomLeft);
-            selectionHandles.Add(bottomRight);
+                // Keep pixel location display visible
+                if (pixelLocationDisplay != null)
+                {
+                    pixelLocationDisplay.Show();
+                }
+
+                // Update JSON data with final location
+                jsonDataEntry.SetCurrentLocation(currentPixelLocation);
+
+                // Update the marker position for the selected sprite
+                UpdateSelectedSpriteMarker();
+            }
         }
 
         public void UpdateHandlePositions()
         {
-            foreach (var handle in selectionHandles)
-            {
-                handle.UpdatePosition(currentZoom);
-            }
-        }
-
-        private void ClearHandles()
-        {
-            foreach (var handle in selectionHandles)
-            {
-                imageCanvas.Children.Remove(handle);
-            }
-            selectionHandles.Clear();
+            // Method kept for compatibility
         }
 
         private void btnAddSelection_Click(object sender, RoutedEventArgs e)
         {
-            if (selectionRect == null || string.IsNullOrWhiteSpace(txtSelectionName.Text))
-            {
-                MessageBox.Show("Please draw a selection and provide a name for it.", "Atlas Plotter",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            int left = (int)Canvas.GetLeft(selectionRect);
-            int top = (int)Canvas.GetTop(selectionRect);
-            int width = (int)selectionRect.Width;
-            int height = (int)selectionRect.Height;
-
-            var permRect = new Rectangle
-            {
-                Stroke = Brushes.Blue,
-                StrokeThickness = 2 / currentZoom, // Adjust stroke thickness for zoom level
-                StrokeDashArray = new DoubleCollection { 4 / currentZoom, 2 / currentZoom }, // Scale dash pattern for zoom
-                Fill = new SolidColorBrush(Color.FromArgb(30, 0, 0, 255))
-            };
-
-            Canvas.SetLeft(permRect, left);
-            Canvas.SetTop(permRect, top);
-            permRect.Width = width;
-            permRect.Height = height;
-
-            var textBlock = new TextBlock
-            {
-                Text = $"{txtSelectionName.Text} [{width}x{height}]",
-                Background = new SolidColorBrush(Color.FromArgb(200, 255, 255, 255)),
-                Foreground = Brushes.Black,
-                Padding = new Thickness(2 / currentZoom), // Scale padding for zoom
-                FontSize = 12 / currentZoom // Scale font size for zoom
-            };
-
-            Canvas.SetLeft(textBlock, left);
-            Canvas.SetTop(textBlock, top > 20 ? top - (20 / currentZoom) : top + height);
-
-            // Remove selection rectangle and handles
-            imageCanvas.Children.Remove(selectionRect);
-            ClearHandles();
-            
-            // Add permanent elements
-            imageCanvas.Children.Add(permRect);
-            imageCanvas.Children.Add(textBlock);
-
-            atlasItems.Add(new AtlasItem
-            {
-                Name = txtSelectionName.Text,
-                X = left,
-                Y = top,
-                Width = width,
-                Height = height
-            });
-
-            selectionRect = null;
-            txtSelectionName.Text = string.Empty;
-            btnAddSelection.IsEnabled = false;
-
-            UpdateSelectionStatus(0, 0, 0, 0, true);
+            // Not needed with the new approach
         }
 
         private void btnSaveAtlas_Click(object sender, RoutedEventArgs e)
         {
-            if (loadedImage == null || atlasItems.Count == 0)
+            if (loadedImage == null)
             {
-                MessageBox.Show("Please load an image and create at least one selection before saving.",
+                MessageBox.Show("Please load an image before saving.",
                     "Atlas Plotter", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
@@ -280,27 +313,20 @@ namespace ATLASPlotterJSON
             {
                 try
                 {
-                    var atlas = new Atlas
-                    {
-                        ImagePath = Path.GetFileName(imagePath),
-                        ImageWidth = loadedImage.PixelWidth,
-                        ImageHeight = loadedImage.PixelHeight,
-                        Frames = atlasItems
-                    };
-
+                    // Create a simple object to save - save the entire collection
                     var options = new JsonSerializerOptions
                     {
                         WriteIndented = true
                     };
-                    string json = JsonSerializer.Serialize(atlas, options);
+                    string json = JsonSerializer.Serialize(jsonDataEntry.SpriteCollection, options);
                     File.WriteAllText(saveFileDialog.FileName, json);
 
-                    MessageBox.Show("Atlas JSON saved successfully!", "Atlas Plotter",
-                        MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show($"JSON data saved successfully with {jsonDataEntry.SpriteCollection.Items.Count} sprite items!",
+                        "Atlas Plotter", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Error saving atlas: {ex.Message}", "Error",
+                    MessageBox.Show($"Error saving JSON: {ex.Message}", "Error",
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
@@ -313,20 +339,26 @@ namespace ATLASPlotterJSON
 
         private void ClearSelections()
         {
+            // Remove all elements except the image and pixel location display
             var children = imageCanvas.Children.Cast<UIElement>().ToList();
             foreach (var child in children)
             {
-                if (child != displayImage)
+                if (child != displayImage && child != pixelLocationDisplay && !(child is SpriteItemMarker))
                 {
                     imageCanvas.Children.Remove(child);
                 }
             }
 
+            // Clear sprite markers
+            ClearSpriteMarkers();
+
             atlasItems.Clear();
-            selectionRect = null;
-            ClearHandles();
-            btnAddSelection.IsEnabled = false;
-            txtSelectionName.Text = string.Empty;
+
+            // Hide pixel location display
+            if (pixelLocationDisplay != null)
+            {
+                pixelLocationDisplay.Hide();
+            }
         }
 
         public void UpdateSelectionStatus(double x, double y, double width, double height, bool clear = false)
@@ -339,7 +371,7 @@ namespace ATLASPlotterJSON
                 }
                 else
                 {
-                    tbSelectionInfo.Text = $"X: {(int)x}, Y: {(int)y}, Width: {(int)width}, Height: {(int)height}";
+                    tbSelectionInfo.Text = $"X: {(int)x}, Y: {(int)y}";
                 }
             }
         }
@@ -378,11 +410,17 @@ namespace ATLASPlotterJSON
             // Update UI to show current zoom level
             UpdateZoomDisplay();
 
-            // Adjust the thickness of existing selections for the new zoom level
-            UpdateSelectionsForZoom();
-            
-            // Update handle positions for the new zoom level
-            UpdateHandlePositions();
+            // Update pixel location display if visible
+            if (pixelLocationDisplay != null && pixelLocationDisplay.Visibility == Visibility.Visible)
+            {
+                pixelLocationDisplay.UpdatePosition(pixelLocationDisplay.CurrentLocation, currentZoom);
+            }
+
+            // Update all sprite markers with new zoom
+            foreach (var marker in spriteMarkers.Values)
+            {
+                marker.UpdatePosition(currentZoom);
+            }
         }
 
         private void UpdateZoomDisplay()
@@ -390,40 +428,10 @@ namespace ATLASPlotterJSON
             txtZoomLevel.Text = $"{currentZoom * 100:0}%";
         }
 
-        private void UpdateSelectionsForZoom()
-        {
-            // Update the visual appearance of all selection rectangles and labels
-            foreach (var child in imageCanvas.Children)
-            {
-                if (child is Rectangle rect && rect != selectionRect && !(child is SelectionHandle))
-                {
-                    rect.StrokeThickness = 2 / currentZoom;
-                    if (rect.StrokeDashArray?.Count > 0)
-                    {
-                        rect.StrokeDashArray = new DoubleCollection { 4 / currentZoom, 2 / currentZoom };
-                    }
-                }
-                else if (child is TextBlock tb && tb != tbSelectionInfo)
-                {
-                    tb.FontSize = 12 / currentZoom;
-                    tb.Padding = new Thickness(2 / currentZoom);
-                }
-            }
-
-            // Update the current selection rectangle if it exists
-            if (selectionRect != null)
-            {
-                selectionRect.StrokeThickness = 2 / currentZoom;
-            }
-        }
-
         private void scrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
         {
             if (Keyboard.Modifiers == ModifierKeys.Control)
             {
-                // Get current mouse position relative to the image canvas
-                Point mousePos = e.GetPosition(imageCanvas);
-
                 // Calculate zoom factor based on wheel direction
                 double zoomFactor = e.Delta > 0 ? ZoomIncrement : -ZoomIncrement;
                 double newZoom = Math.Max(MinZoom, Math.Min(MaxZoom, currentZoom + zoomFactor));

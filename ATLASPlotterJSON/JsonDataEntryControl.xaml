@@ -1,0 +1,306 @@
+﻿<UserControl x:Class="ATLASPlotterJSON.JsonDataEntryControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:ATLASPlotterJSON"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="300">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- Header -->
+        <TextBlock Grid.Row="0" Text="Sprite JSON Data" FontWeight="Bold" 
+                   Margin="5" FontSize="14" HorizontalAlignment="Center"/>
+        
+        <!-- Sprite Entry Selection -->
+        <Grid Grid.Row="1" Margin="5">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            
+            <ComboBox Grid.Column="0" x:Name="cmbSpriteItems" 
+                      ItemsSource="{Binding Items}"
+                      SelectedItem="{Binding SelectedItem}"
+                      DisplayMemberPath="Name"
+                      Margin="0,0,5,0"/>
+            
+            <Button Grid.Column="1" x:Name="btnAddSprite" Content="+" 
+                    Width="25" Margin="0,0,5,0"
+                    Click="AddSprite_Click" ToolTip="Add New Sprite"/>
+            
+            <Button Grid.Column="2" x:Name="btnRemoveSprite" Content="–" 
+                    Width="25"
+                    Click="RemoveSprite_Click" ToolTip="Remove Selected Sprite"/>
+        </Grid>
+        
+        <!-- Data Entry Fields - Scrollable -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="5" x:Name="dataEntryPanel">
+                <!-- Basic Properties -->
+                <GroupBox Header="Basic Properties" Margin="0,0,0,10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="ID:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedItem.Id}" Margin="0,5,0,5"/>
+                        
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Name:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SelectedItem.Name}" Margin="0,5,0,5"/>
+                        
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Y Sort:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SelectedItem.YSort}" Margin="0,5,0,5"/>
+                        
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Fragile:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                        <CheckBox Grid.Row="3" Grid.Column="1" IsChecked="{Binding SelectedItem.Fragile}" Margin="0,5,0,5" VerticalAlignment="Center"/>
+                        
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Breakable:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                        <CheckBox Grid.Row="4" Grid.Column="1" IsChecked="{Binding SelectedItem.Breakable}" Margin="0,5,0,5" VerticalAlignment="Center"/>
+                    </Grid>
+                </GroupBox>
+                
+                <!-- Offset -->
+                <GroupBox Header="Offset" Margin="0,0,0,10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="X:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedItem.Offset.X}" Margin="0,5,0,5"/>
+                        
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Y:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SelectedItem.Offset.Y}" Margin="0,5,0,5"/>
+                    </Grid>
+                </GroupBox>
+                
+                <!-- Source -->
+                <GroupBox Header="Source" Margin="0,0,0,10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="X:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedItem.Source.X}" Margin="0,5,0,5"/>
+                        
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Y:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SelectedItem.Source.Y}" Margin="0,5,0,5"/>
+                        
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Width:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SelectedItem.Source.Width}" Margin="0,5,0,5"/>
+                        
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Height:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding SelectedItem.Source.Height}" Margin="0,5,0,5"/>
+                    </Grid>
+                </GroupBox>
+                
+                <!-- Shadow Offset -->
+                <GroupBox Header="Shadow Offset" Margin="0,0,0,10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="X:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedItem.ShadowOffset.X}" Margin="0,5,0,5"/>
+                        
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Y:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SelectedItem.ShadowOffset.Y}" Margin="0,5,0,5"/>
+                    </Grid>
+                </GroupBox>
+                
+                <!-- Shadow Source -->
+                <GroupBox Header="Shadow Source" Margin="0,0,0,10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="X:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedItem.ShadowSource.X}" Margin="0,5,0,5"/>
+                        
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Y:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SelectedItem.ShadowSource.Y}" Margin="0,5,0,5"/>
+                        
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Width:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SelectedItem.ShadowSource.Width}" Margin="0,5,0,5"/>
+                        
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Height:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding SelectedItem.ShadowSource.Height}" Margin="0,5,0,5"/>
+                    </Grid>
+                </GroupBox>
+                
+                <!-- Colliders -->
+                <GroupBox Header="Colliders" Margin="0,0,0,10">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        
+                        <Button Grid.Row="0" Content="Add Collider" HorizontalAlignment="Right" 
+                                Margin="0,5,0,5" Padding="5,2" Click="AddCollider_Click"/>
+                        
+                        <ItemsControl Grid.Row="1" ItemsSource="{Binding SelectedItem.Colliders}" Margin="0,5,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <GroupBox Header="{Binding Type}" Margin="0,0,0,5">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+                                            
+                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="X:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding X}" Margin="0,5,0,5"/>
+                                            
+                                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Y:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                                            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Y}" Margin="0,5,0,5"/>
+                                            
+                                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Width:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                                            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Width}" Margin="0,5,0,5"/>
+                                            
+                                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Height:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                                            <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Height}" Margin="0,5,0,5"/>
+                                            
+                                            <Button Grid.Row="0" Grid.RowSpan="2" Grid.Column="2" Content="✕" 
+                                                    Click="RemoveCollider_Click" Tag="{Binding}"
+                                                    VerticalAlignment="Center" Padding="5,2"/>
+                                        </Grid>
+                                    </GroupBox>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+                </GroupBox>
+                
+                <!-- Breaking Animation -->
+                <GroupBox Header="Breaking Animation" Margin="0,0,0,10">
+                    <StackPanel>
+                        <GroupBox Header="Source">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="X:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                                <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedItem.BreakingAnimation.Source.X}" Margin="0,5,0,5"/>
+                                
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Y:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SelectedItem.BreakingAnimation.Source.Y}" Margin="0,5,0,5"/>
+                                
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Width:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                                <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SelectedItem.BreakingAnimation.Source.Width}" Margin="0,5,0,5"/>
+                                
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Height:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                                <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding SelectedItem.BreakingAnimation.Source.Height}" Margin="0,5,0,5"/>
+                            </Grid>
+                        </GroupBox>
+                        
+                        <GroupBox Header="Offset" Margin="0,5,0,5">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="X:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                                <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedItem.BreakingAnimation.Offset.X}" Margin="0,5,0,5"/>
+                                
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Y:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SelectedItem.BreakingAnimation.Offset.Y}" Margin="0,5,0,5"/>
+                            </Grid>
+                        </GroupBox>
+                        
+                        <Grid Margin="5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="X Inverted:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedItem.BreakingAnimation.XInverted}" Margin="0,5,0,5"/>
+                            
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Frame Duration:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SelectedItem.BreakingAnimation.FrameDuration}" Margin="0,5,0,5"/>
+                            
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Num Frames:" Margin="0,5,5,5" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SelectedItem.BreakingAnimation.NbFrames}" Margin="0,5,0,5"/>
+                        </Grid>
+                    </StackPanel>
+                </GroupBox>
+            </StackPanel>
+        </ScrollViewer>
+        
+        <!-- Action Buttons -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="5">
+            <Button Content="Load JSON" Margin="5" Padding="8,3" Click="LoadJson_Click"/>
+            <Button Content="Save JSON" Margin="5" Padding="8,3" Click="SaveJson_Click"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

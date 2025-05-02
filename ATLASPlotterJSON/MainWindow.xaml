@@ -5,18 +5,22 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ATLASPlotterJSON"
         mc:Ignorable="d"
-        Title="Atlas Plotter" Height="600" Width="900"
+        Title="Atlas Plotter" Height="600" Width="1100"
         WindowStartupLocation="CenterScreen">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="350"/>
+        </Grid.ColumnDefinitions>
+        
         <!-- Top Controls -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="10">
+        <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Margin="10">
             <Button x:Name="btnLoadImage" Content="Load Image" Padding="8,3" Margin="0,0,10,0" Click="btnLoadImage_Click"/>
             <Button x:Name="btnSaveAtlas" Content="Save Atlas JSON" Padding="8,3" Margin="0,0,10,0" Click="btnSaveAtlas_Click" IsEnabled="False"/>
             <Button x:Name="btnClearSelections" Content="Clear All" Padding="8,3" Margin="0,0,10,0" Click="btnClearSelections_Click" IsEnabled="False"/>
@@ -28,7 +32,7 @@
         </StackPanel>
 
         <!-- Image Display Area -->
-        <Border Grid.Row="1" BorderBrush="Gray" BorderThickness="1" Margin="10" Background="#FFE5E5E5">
+        <Border Grid.Row="1" Grid.Column="0" BorderBrush="Gray" BorderThickness="1" Margin="10" Background="#FFE5E5E5">
             <ScrollViewer x:Name="scrollViewer" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
                           PreviewMouseWheel="scrollViewer_PreviewMouseWheel">
                 <Canvas x:Name="imageCanvas" Background="Transparent" 
@@ -44,22 +48,13 @@
             </ScrollViewer>
         </Border>
 
-        <!-- Bottom Controls -->
-        <Grid Grid.Row="2" Margin="10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            
-            <TextBlock Grid.Column="0" Text="Selection Name:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-            <TextBox x:Name="txtSelectionName" Grid.Column="1" Margin="0,0,10,0" VerticalAlignment="Center"/>
-            <Button x:Name="btnAddSelection" Grid.Column="2" Content="Add Selection" Padding="8,3" 
-                    Click="btnAddSelection_Click" IsEnabled="False"/>
-        </Grid>
+        <!-- JSON Data Entry Panel -->
+        <local:JsonDataEntryControl x:Name="jsonDataEntry" 
+                                   Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" 
+                                   Margin="0,10,10,10"/>
 
         <!-- Status Bar -->
-        <StatusBar Grid.Row="3" Height="22">
+        <StatusBar Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Height="22">
             <TextBlock x:Name="tbSelectionInfo" />
         </StatusBar>
     </Grid>
