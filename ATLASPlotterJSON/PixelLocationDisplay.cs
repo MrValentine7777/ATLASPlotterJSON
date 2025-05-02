@@ -15,6 +15,9 @@ namespace ATLASPlotterJSON
         // Size of the highlight box in screen space
         private const double BoxSize = 12.0;
         
+        // Additional vertical offset to avoid overlap with selection name
+        private const double VerticalOffset = 10.0;
+        
         public Point CurrentLocation { get; private set; }
         
         public PixelLocationDisplay(MainWindow parent)
@@ -64,8 +67,9 @@ namespace ATLASPlotterJSON
             coordsText.Text = $"X: {(int)location.X}, Y: {(int)location.Y}";
             
             // Position the text near the highlight box but ensure it's visible
+            // Added VerticalOffset to move the text up by additional pixels
             Canvas.SetLeft(coordsText, location.X + (BoxSize / zoomLevel));
-            Canvas.SetTop(coordsText, location.Y - coordsText.ActualHeight - (BoxSize / zoomLevel));
+            Canvas.SetTop(coordsText, location.Y - coordsText.ActualHeight - (BoxSize / zoomLevel) - (VerticalOffset / zoomLevel));
             
             // Adjust text for zoom
             coordsText.FontSize = 12 / zoomLevel;
