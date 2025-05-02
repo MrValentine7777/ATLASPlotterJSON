@@ -120,8 +120,9 @@ namespace ATLASPlotterJSON
             originalWidth = TargetRectangle.Width;
             originalHeight = TargetRectangle.Height;
 
-            // Store the mouse start position
-            dragStartPoint = e.GetPosition((Canvas)this.Parent);
+            // Store the mouse start position and convert to unzoomed coordinates
+            // This ensures we're tracking in the same coordinate space as the rectangle
+            dragStartPoint = parentWindow.SnapToPixel(e.GetPosition((Canvas)this.Parent));
 
             // Capture the mouse
             this.CaptureMouse();
@@ -132,10 +133,13 @@ namespace ATLASPlotterJSON
         {
             if (this.IsMouseCaptured)
             {
-                // Get current mouse position and calculate delta
+                // Get current mouse position and convert to unzoomed coordinates
                 Point currentPoint = parentWindow.SnapToPixel(e.GetPosition((Canvas)this.Parent));
-                double deltaX = currentPoint.X - dragStartPoint.X / parentWindow.CurrentZoom;
-                double deltaY = currentPoint.Y - dragStartPoint.Y / parentWindow.CurrentZoom;
+                
+                // Calculate delta in unzoomed coordinates
+                // Note: SnapToPixel already applies the zoom conversion
+                double deltaX = currentPoint.X - dragStartPoint.X;
+                double deltaY = currentPoint.Y - dragStartPoint.Y;
 
                 // Calculate new rectangle dimensions based on which handle is being dragged
                 double newLeft = originalLeft;
