@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.ComponentModel;
 
 namespace ATLASPlotterJSON
 {
@@ -58,6 +59,32 @@ namespace ATLASPlotterJSON
             
             // Set ZIndex to ensure it's above the image but below UI elements
             SetZIndex(this, 50);
+            
+            // Subscribe to property changes of the sprite item
+            spriteItem.PropertyChanged += SpriteItem_PropertyChanged;
+        }
+        
+        private void SpriteItem_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            // Update the visual display when properties change
+            if (e.PropertyName == "Name")
+            {
+                UpdateNameDisplay();
+            }
+            else if (e.PropertyName == "Source" || 
+                     e.PropertyName == "X" || 
+                     e.PropertyName == "Y" || 
+                     e.PropertyName == "Width" || 
+                     e.PropertyName == "Height")
+            {
+                UpdatePosition();
+            }
+        }
+        
+        private void UpdateNameDisplay()
+        {
+            // Update the label text to reflect the current name
+            label.Text = $"#{spriteItem.Id}: {spriteItem.Name}";
         }
         
         public void UpdatePosition(double zoomLevel = 1.0)
@@ -68,6 +95,9 @@ namespace ATLASPlotterJSON
             sourceBox.Width = spriteItem.Source.Width;
             sourceBox.Height = spriteItem.Source.Height;
             sourceBox.StrokeThickness = 2 / zoomLevel;
+            
+            // Update the label text to ensure it's current
+            UpdateNameDisplay();
             
             // Position the label at the top-left corner of the box
             Canvas.SetLeft(label, spriteItem.Source.X);
