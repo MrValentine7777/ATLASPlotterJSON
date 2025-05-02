@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
@@ -132,8 +133,8 @@ namespace ATLASPlotterJSON
         /// These define which parts of the sprite can interact with other game elements.
         /// For example, a tree might have a smaller collision area than its visual appearance.
         /// </summary>
-        private List<Collider> _colliders = new();
-        public List<Collider> Colliders
+        private ObservableCollection<Collider> _colliders = new();
+        public ObservableCollection<Collider> Colliders
         {
             get => _colliders;
             set { _colliders = value; OnPropertyChanged(); }

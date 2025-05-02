@@ -202,7 +202,7 @@ namespace ATLASPlotterJSON
                 ShadowSource = new RectSource { X = 1, Y = 18, Width = 8, Height = 6 },
                 
                 // Default collision area for the sprite
-                Colliders = new List<Collider>
+                Colliders = new ObservableCollection<Collider>
                 {
                     new Collider { Type = "rectangle", X = 4, Y = 4, Width = 8, Height = 8 }
                 },
