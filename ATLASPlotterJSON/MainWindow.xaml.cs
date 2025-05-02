@@ -26,10 +26,21 @@ namespace ATLASPlotterJSON
         private Point startPoint;
         private bool isDrawing;
         private string? imagePath;
+        private readonly List<SelectionHandle> selectionHandles = new();
+
+        // Zoom related properties
+        private double currentZoom = 1.0;
+        private const double ZoomIncrement = 0.25;
+        private const double MinZoom = 0.25;
+        private const double MaxZoom = 8.0;
+
+        // Make currentZoom public so handles can access it
+        public double CurrentZoom => currentZoom;
 
         public MainWindow()
         {
             InitializeComponent();
+            UpdateZoomDisplay();
         }
 
         private void btnLoadImage_Click(object sender, RoutedEventArgs e)
@@ -49,6 +60,7 @@ namespace ATLASPlotterJSON
                     ClearSelections();
                     btnSaveAtlas.IsEnabled = true;
                     btnClearSelections.IsEnabled = true;
+                    ResetZoom();
                 }
                 catch (Exception ex)
                 {
@@ -72,8 +84,11 @@ namespace ATLASPlotterJSON
             Title = $"Atlas Plotter - {System.IO.Path.GetFileName(path)}";
         }
 
-        private Point SnapToPixel(Point point)
+        public Point SnapToPixel(Point point)
         {
+            // Convert mouse position from transformed canvas coordinates to original coordinates
+            point.X /= currentZoom;
+            point.Y /= currentZoom;
             return new Point(Math.Floor(point.X), Math.Floor(point.Y));
         }
 
@@ -81,11 +96,14 @@ namespace ATLASPlotterJSON
         {
             if (loadedImage == null) return;
 
+            // Clear previous selection handles
+            ClearHandles();
+
             startPoint = SnapToPixel(e.GetPosition(imageCanvas));
             selectionRect = new Rectangle
             {
                 Stroke = Brushes.LimeGreen,
-                StrokeThickness = 2,
+                StrokeThickness = 2 / currentZoom, // Adjust stroke thickness for zoom level
                 Fill = new SolidColorBrush(Color.FromArgb(50, 0, 255, 0))
             };
 
@@ -106,8 +124,8 @@ namespace ATLASPlotterJSON
             {
                 var currentPoint = SnapToPixel(e.GetPosition(imageCanvas));
 
-                currentPoint.X = Math.Max(0, Math.Min(currentPoint.X, Math.Floor(imageCanvas.Width)));
-                currentPoint.Y = Math.Max(0, Math.Min(currentPoint.Y, Math.Floor(imageCanvas.Height)));
+                currentPoint.X = Math.Max(0, Math.Min(currentPoint.X, Math.Floor(imageCanvas.Width / currentZoom)));
+                currentPoint.Y = Math.Max(0, Math.Min(currentPoint.Y, Math.Floor(imageCanvas.Height / currentZoom)));
 
                 int left = (int)Math.Min(startPoint.X, currentPoint.X);
                 int top = (int)Math.Min(startPoint.Y, currentPoint.Y);
@@ -128,10 +146,54 @@ namespace ATLASPlotterJSON
 
         private void imageCanvas_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            if (isDrawing)
+            if (isDrawing && selectionRect != null)
             {
                 isDrawing = false;
+                
+                // Add handles to the selection
+                AddHandlesToSelection(selectionRect);
             }
+        }
+
+        private void AddHandlesToSelection(Rectangle rect)
+        {
+            // Clear any existing handles
+            ClearHandles();
+            
+            // Create handles for each corner
+            var topLeft = new SelectionHandle(HandlePosition.TopLeft, rect, this);
+            var topRight = new SelectionHandle(HandlePosition.TopRight, rect, this);
+            var bottomLeft = new SelectionHandle(HandlePosition.BottomLeft, rect, this);
+            var bottomRight = new SelectionHandle(HandlePosition.BottomRight, rect, this);
+            
+            // Add handles to the canvas
+            imageCanvas.Children.Add(topLeft);
+            imageCanvas.Children.Add(topRight);
+            imageCanvas.Children.Add(bottomLeft);
+            imageCanvas.Children.Add(bottomRight);
+            
+            // Store handles for later reference
+            selectionHandles.Add(topLeft);
+            selectionHandles.Add(topRight);
+            selectionHandles.Add(bottomLeft);
+            selectionHandles.Add(bottomRight);
+        }
+
+        public void UpdateHandlePositions()
+        {
+            foreach (var handle in selectionHandles)
+            {
+                handle.UpdatePosition(currentZoom);
+            }
+        }
+
+        private void ClearHandles()
+        {
+            foreach (var handle in selectionHandles)
+            {
+                imageCanvas.Children.Remove(handle);
+            }
+            selectionHandles.Clear();
         }
 
         private void btnAddSelection_Click(object sender, RoutedEventArgs e)
@@ -151,8 +213,8 @@ namespace ATLASPlotterJSON
             var permRect = new Rectangle
             {
                 Stroke = Brushes.Blue,
-                StrokeThickness = 2,
-                StrokeDashArray = new DoubleCollection { 4, 2 },
+                StrokeThickness = 2 / currentZoom, // Adjust stroke thickness for zoom level
+                StrokeDashArray = new DoubleCollection { 4 / currentZoom, 2 / currentZoom }, // Scale dash pattern for zoom
                 Fill = new SolidColorBrush(Color.FromArgb(30, 0, 0, 255))
             };
 
@@ -166,13 +228,18 @@ namespace ATLASPlotterJSON
                 Text = $"{txtSelectionName.Text} [{width}x{height}]",
                 Background = new SolidColorBrush(Color.FromArgb(200, 255, 255, 255)),
                 Foreground = Brushes.Black,
-                Padding = new Thickness(2)
+                Padding = new Thickness(2 / currentZoom), // Scale padding for zoom
+                FontSize = 12 / currentZoom // Scale font size for zoom
             };
 
             Canvas.SetLeft(textBlock, left);
-            Canvas.SetTop(textBlock, top > 20 ? top - 20 : top + height);
+            Canvas.SetTop(textBlock, top > 20 ? top - (20 / currentZoom) : top + height);
 
+            // Remove selection rectangle and handles
             imageCanvas.Children.Remove(selectionRect);
+            ClearHandles();
+            
+            // Add permanent elements
             imageCanvas.Children.Add(permRect);
             imageCanvas.Children.Add(textBlock);
 
@@ -257,11 +324,12 @@ namespace ATLASPlotterJSON
 
             atlasItems.Clear();
             selectionRect = null;
+            ClearHandles();
             btnAddSelection.IsEnabled = false;
             txtSelectionName.Text = string.Empty;
         }
 
-        private void UpdateSelectionStatus(double x, double y, double width, double height, bool clear = false)
+        public void UpdateSelectionStatus(double x, double y, double width, double height, bool clear = false)
         {
             if (tbSelectionInfo != null)
             {
@@ -273,6 +341,98 @@ namespace ATLASPlotterJSON
                 {
                     tbSelectionInfo.Text = $"X: {(int)x}, Y: {(int)y}, Width: {(int)width}, Height: {(int)height}";
                 }
+            }
+        }
+
+        // Zoom functionality
+        private void btnZoomIn_Click(object sender, RoutedEventArgs e)
+        {
+            ApplyZoom(currentZoom + ZoomIncrement);
+        }
+
+        private void btnZoomOut_Click(object sender, RoutedEventArgs e)
+        {
+            ApplyZoom(currentZoom - ZoomIncrement);
+        }
+
+        private void btnZoomReset_Click(object sender, RoutedEventArgs e)
+        {
+            ResetZoom();
+        }
+
+        private void ResetZoom()
+        {
+            ApplyZoom(1.0);
+        }
+
+        private void ApplyZoom(double zoom)
+        {
+            // Clamp zoom level to limits
+            zoom = Math.Max(MinZoom, Math.Min(MaxZoom, zoom));
+
+            // Apply zoom
+            currentZoom = zoom;
+            zoomTransform.ScaleX = zoom;
+            zoomTransform.ScaleY = zoom;
+
+            // Update UI to show current zoom level
+            UpdateZoomDisplay();
+
+            // Adjust the thickness of existing selections for the new zoom level
+            UpdateSelectionsForZoom();
+            
+            // Update handle positions for the new zoom level
+            UpdateHandlePositions();
+        }
+
+        private void UpdateZoomDisplay()
+        {
+            txtZoomLevel.Text = $"{currentZoom * 100:0}%";
+        }
+
+        private void UpdateSelectionsForZoom()
+        {
+            // Update the visual appearance of all selection rectangles and labels
+            foreach (var child in imageCanvas.Children)
+            {
+                if (child is Rectangle rect && rect != selectionRect && !(child is SelectionHandle))
+                {
+                    rect.StrokeThickness = 2 / currentZoom;
+                    if (rect.StrokeDashArray?.Count > 0)
+                    {
+                        rect.StrokeDashArray = new DoubleCollection { 4 / currentZoom, 2 / currentZoom };
+                    }
+                }
+                else if (child is TextBlock tb && tb != tbSelectionInfo)
+                {
+                    tb.FontSize = 12 / currentZoom;
+                    tb.Padding = new Thickness(2 / currentZoom);
+                }
+            }
+
+            // Update the current selection rectangle if it exists
+            if (selectionRect != null)
+            {
+                selectionRect.StrokeThickness = 2 / currentZoom;
+            }
+        }
+
+        private void scrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                // Get current mouse position relative to the image canvas
+                Point mousePos = e.GetPosition(imageCanvas);
+
+                // Calculate zoom factor based on wheel direction
+                double zoomFactor = e.Delta > 0 ? ZoomIncrement : -ZoomIncrement;
+                double newZoom = Math.Max(MinZoom, Math.Min(MaxZoom, currentZoom + zoomFactor));
+
+                // Apply the zoom
+                ApplyZoom(newZoom);
+
+                // Prevent the ScrollViewer from scrolling
+                e.Handled = true;
             }
         }
     }
