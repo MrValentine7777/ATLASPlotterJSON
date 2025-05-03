@@ -22,7 +22,19 @@ ATLAS Plotter is a tool for defining sprite regions within a sprite atlas image.
 
 ## Application Architecture
 - **MainWindow**: The UI container and main controller
-- **Sprite
+- **AtlasImage**: Represents the sprite atlas image and its properties
+- **Sprite**: Represents individual sprites within the atlas, including properties like position, size, and name
+- **Collider**: Represents the collision boundaries for sprites
+- **SpriteManager**: Manages the collection of sprites and their properties
+- **JsonSerializer**: Handles serialization and deserialization of sprite data to/from JSON format
+- **ZoomViewer**: Provides a zoomed-in view of the sprite atlas for detailed editing
+- **PixelTracker**: Tracks pixel coordinates for precise sprite placement
+- **SpriteSelector**: Allows users to select and define sprites within the atlas image
+- **PropertyEditor**: Provides a UI for editing sprite properties
+- **ColliderEditor**: Provides a UI for editing sprite colliders
+- **FileManager**: Handles loading and saving of sprite atlas images and JSON data
+- **ErrorHandler**: Manages error handling and user notifications
+
 
 ## Made with the help of GitHub CoPilot.
 - GitHub CoPilot**: Assisted in generating code snippets, comments, and documentation
