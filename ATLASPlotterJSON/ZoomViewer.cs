@@ -313,11 +313,13 @@ namespace ATLASPlotterJSON
         /// </summary>
         private void UpdateMarkers()
         {
-            // Remove any existing markers
+            // Remove any existing marker elements but keep the image and viewport indicator
             for (int i = contentCanvas.Children.Count - 1; i >= 0; i--)
             {
-                if (contentCanvas.Children[i] is Rectangle rect && 
-                    rect != viewportIndicator)
+                UIElement element = contentCanvas.Children[i];
+                if ((element is Rectangle rect && rect != viewportIndicator) ||
+                    (element is Canvas canvas && canvas.Tag as string == "ZoomMarkerContainer") ||
+                    (element is TextBlock tb && tb.Tag as string == "ZoomMarkerLabel"))
                 {
                     contentCanvas.Children.RemoveAt(i);
                 }
@@ -332,6 +334,12 @@ namespace ATLASPlotterJSON
             {
                 var marker = markerPair.Value;
                 
+                // Create a container for the marker and label
+                Canvas markerContainer = new Canvas
+                {
+                    Tag = "ZoomMarkerContainer"
+                };
+                
                 // Get sprite position and dimensions
                 double x = marker.SpriteItem.Source.X;
                 double y = marker.SpriteItem.Source.Y;
@@ -344,14 +352,31 @@ namespace ATLASPlotterJSON
                     Width = width,
                     Height = height,
                     Stroke = new SolidColorBrush(marker.MarkerColor),
-                    StrokeThickness = 1 / currentZoom,  // Scale stroke thickness
-                    Fill = new SolidColorBrush(Color.FromArgb(30, 
+                    StrokeThickness = Math.Max(1.0 / currentZoom, 0.5),  // Scale stroke thickness with zoom
+                    Fill = new SolidColorBrush(Color.FromArgb(40, 
                         marker.MarkerColor.R, 
                         marker.MarkerColor.G, 
-                        marker.MarkerColor.B))
+                        marker.MarkerColor.B)),
+                    Tag = "ZoomMarkerRect"
                 };
                 
-                // Create a transform group for the marker
+                // Create a label for the marker similar to SpriteItemMarker
+                var label = new TextBlock
+                {
+                    Text = $"#{marker.SpriteItem.Id}: {marker.SpriteItem.Name}",
+                    Background = new SolidColorBrush(Color.FromArgb(180, 0, 0, 0)),
+                    Foreground = new SolidColorBrush(marker.MarkerColor),
+                    Padding = new Thickness(2),
+                    FontWeight = FontWeights.Bold,
+                    FontSize = Math.Min(12 * (1.0 / currentZoom) * 3, 12), // Scale font based on zoom
+                    Tag = "ZoomMarkerLabel"
+                };
+                
+                // Add elements to the container
+                markerContainer.Children.Add(rect);
+                markerContainer.Children.Add(label);
+                
+                // Create a transform group for the container
                 TransformGroup transformGroup = new TransformGroup();
                 
                 // Add scale transform
@@ -364,11 +389,43 @@ namespace ATLASPlotterJSON
                     (y - panOffset.Y) * currentZoom);
                 transformGroup.Children.Add(translateTransform);
                 
-                // Apply the transform
-                rect.RenderTransform = transformGroup;
+                // Apply the transform to the container
+                markerContainer.RenderTransform = transformGroup;
                 
-                // Add to the canvas
-                contentCanvas.Children.Insert(contentCanvas.Children.IndexOf(viewportIndicator), rect);
+                // Position the label above the rectangle
+                Canvas.SetLeft(rect, 0);
+                Canvas.SetTop(rect, 0);
+                Canvas.SetLeft(label, 0);
+                Canvas.SetTop(label, -20 / currentZoom); // Position above the rectangle
+                
+                // Ensure text is readable at any zoom level
+                if (currentZoom > 8)
+                {
+                    // At high zoom, make text smaller
+                    label.FontSize = Math.Max(8, 12 / (currentZoom / 8));
+                }
+                
+                // Show whether this sprite is selected
+                bool isSelected = marker.SpriteItem == parentWindow.jsonDataEntry.SpriteCollection.SelectedItem;
+                if (isSelected)
+                {
+                    rect.StrokeThickness = Math.Max(2.0 / currentZoom, 1);
+                    rect.StrokeDashArray = new DoubleCollection() { 4.0 / currentZoom, 2.0 / currentZoom };
+                    label.FontWeight = FontWeights.ExtraBold;
+                }
+                
+                // Ensure the marker is above the image but below the viewport indicator
+                if (contentCanvas.Children.Contains(viewportIndicator))
+                {
+                    // Insert just before the viewport indicator to ensure proper z-order
+                    int viewportIndex = contentCanvas.Children.IndexOf(viewportIndicator);
+                    contentCanvas.Children.Insert(viewportIndex, markerContainer);
+                }
+                else
+                {
+                    // Fallback if viewport indicator is not found
+                    contentCanvas.Children.Add(markerContainer);
+                }
             }
         }
 
