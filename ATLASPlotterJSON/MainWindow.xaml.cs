@@ -67,6 +67,16 @@ namespace ATLASPlotterJSON
         /// <summary>The current pixel location being tracked</summary>
         private Point currentPixelLocation;
 
+        // PANNING PROPERTIES
+        /// <summary>True when actively panning the image</summary>
+        private bool isPanning = false;
+
+        /// <summary>The starting point of a pan operation</summary>
+        private Point panStartPoint;
+
+        /// <summary>The current panning offset</summary>
+        private Point panOffset = new Point(0, 0);
+
         /// <summary>
         /// Cached JSON serializer options for saving JSON (serialization).
         /// Configured to create nicely formatted, human-readable JSON files.
@@ -379,7 +389,7 @@ namespace ATLASPlotterJSON
 
         /// <summary>
         /// Converts a mouse position to precise pixel coordinates
-        /// Accounts for image scaling and ensures coordinates are whole numbers
+        /// Accounts for image panning offset
         /// </summary>
         /// <param name="point">The raw mouse position</param>
         /// <returns>The corresponding pixel coordinates on the sprite atlas</returns>
@@ -391,13 +401,10 @@ namespace ATLASPlotterJSON
             double offsetX = Canvas.GetLeft(displayImage);
             double offsetY = Canvas.GetTop(displayImage);
 
-            // Convert from mouse position to image coordinates
-            double scaleX = loadedImage.Width / displayImage.Width;
-            double scaleY = loadedImage.Height / displayImage.Height;
-
-            // Adjust for the image position within the canvas
-            double imageX = (point.X - offsetX) * scaleX;
-            double imageY = (point.Y - offsetY) * scaleY;
+            // At 1:1 scaling, the conversion is simplified
+            // We just need to account for the panning offset
+            double imageX = point.X - offsetX;
+            double imageY = point.Y - offsetY;
 
             // Use Math.Floor to ensure we get whole pixel values and constrain to image bounds
             imageX = Math.Floor(Math.Max(0, Math.Min(imageX, loadedImage.Width - 1)));
@@ -408,11 +415,19 @@ namespace ATLASPlotterJSON
 
         /// <summary>
         /// Event handler for mouse click on the image canvas
-        /// Begins tracking pixel location for sprite placement
+        /// Begins tracking pixel location for sprite placement or starts panning
         /// </summary>
         private void imageCanvas_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (loadedImage == null) return;
+
+            // If holding the middle mouse button or control key, start panning
+            if (e.MiddleButton == MouseButtonState.Pressed || Keyboard.IsKeyDown(Key.LeftCtrl))
+            {
+                StartPanning(e.GetPosition(imageCanvas));
+                e.Handled = true;
+                return;
+            }
 
             // Convert the mouse position to precise pixel coordinates
             currentPixelLocation = SnapToPixel(e.GetPosition(imageCanvas));
@@ -420,14 +435,12 @@ namespace ATLASPlotterJSON
             // Start tracking mouse movement
             isTrackingPixel = true;
 
-            // COMPONENT CONNECTION:
             // Update and show the pixel location display
             if (pixelLocationDisplay != null)
             {
                 pixelLocationDisplay.UpdatePosition(currentPixelLocation);
                 pixelLocationDisplay.Show();
 
-                // COMPONENT CONNECTION:
                 // Update the selected sprite's position in the JsonDataEntryControl
                 jsonDataEntry.SetCurrentLocation(currentPixelLocation);
 
@@ -442,15 +455,70 @@ namespace ATLASPlotterJSON
         }
 
         /// <summary>
+        /// Begins panning the image
+        /// </summary>
+        private void StartPanning(Point startPoint)
+        {
+            isPanning = true;
+            panStartPoint = startPoint;
+            imageCanvas.Cursor = Cursors.Hand;
+            imageCanvas.CaptureMouse(); // Capture mouse to track movement even outside canvas
+        }
+
+        /// <summary>
         /// Event handler for mouse movement on the image canvas
-        /// Tracks pixel location for precise sprite placement
+        /// Tracks pixel location for sprite placement or pans the image
         /// </summary>
         private void imageCanvas_MouseMove(object sender, MouseEventArgs e)
         {
             if (loadedImage == null) return;
 
+            Point currentMousePos = e.GetPosition(imageCanvas);
+
+            // Handle panning if active
+            if (isPanning)
+            {
+                // Calculate the movement delta since starting to pan
+                Vector offset = currentMousePos - panStartPoint;
+                
+                // Get available space
+                var mainGrid = (Grid)Content;
+                double availableWidth = (mainGrid.ColumnDefinitions[0].ActualWidth - 20);
+                double availableHeight = (mainGrid.RowDefinitions[1].ActualHeight - 20);
+
+                // Calculate new position with delta movement
+                double newPosX = panOffset.X + offset.X;
+                double newPosY = panOffset.Y + offset.Y;
+
+                // Apply boundary constraints
+                newPosX = EnforcePanningBoundaryX(newPosX, availableWidth);
+                newPosY = EnforcePanningBoundaryY(newPosY, availableHeight);
+
+                // Update display position
+                Canvas.SetLeft(displayImage, newPosX);
+                Canvas.SetTop(displayImage, newPosY);
+
+                // Update the pixel location display if visible
+                if (pixelLocationDisplay != null && pixelLocationDisplay.Visibility == Visibility.Visible)
+                {
+                    pixelLocationDisplay.UpdatePosition(pixelLocationDisplay.CurrentLocation);
+                }
+
+                // Update all sprite markers to match the new positioning
+                foreach (var marker in spriteMarkers.Values)
+                {
+                    marker.UpdatePosition();
+                }
+
+                // Update selection handles
+                UpdateHandlePositions();
+
+                e.Handled = true;
+                return;
+            }
+
             // Convert the mouse position to precise pixel coordinates
-            Point mousePosition = SnapToPixel(e.GetPosition(imageCanvas));
+            Point mousePosition = SnapToPixel(currentMousePos);
 
             // Always update status bar with current mouse position
             UpdateSelectionStatus(mousePosition.X, mousePosition.Y, 0, 0);
@@ -460,25 +528,75 @@ namespace ATLASPlotterJSON
             {
                 currentPixelLocation = mousePosition;
 
-                // BOUNDARY CHECKING:
                 // Keep the pixel location within the bounds of the image
-                // This prevents selecting pixels outside the sprite atlas
                 currentPixelLocation.X = Math.Max(0, Math.Min(currentPixelLocation.X, loadedImage.Width - 1));
                 currentPixelLocation.Y = Math.Max(0, Math.Min(currentPixelLocation.Y, loadedImage.Height - 1));
 
-                // COMPONENT CONNECTION:
                 // Update the pixel location display with new coordinates
                 if (pixelLocationDisplay != null)
                 {
                     pixelLocationDisplay.UpdatePosition(currentPixelLocation);
 
-                    // COMPONENT CONNECTION:
                     // Update the selected sprite's position in the JsonDataEntryControl
                     jsonDataEntry.SetCurrentLocation(currentPixelLocation);
 
                     // Update the visual marker for the selected sprite
                     UpdateSelectedSpriteMarker();
                 }
+            }
+        }
+
+        /// <summary>
+        /// Event handler for mouse button release on the image canvas
+        /// Finalizes sprite placement or panning operation
+        /// </summary>
+        private void imageCanvas_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (isPanning)
+            {
+                // End panning and save the current position
+                isPanning = false;
+                Point currentMousePos = e.GetPosition(imageCanvas);
+                
+                // Calculate the final offset from the starting point
+                Vector offset = currentMousePos - panStartPoint;
+                
+                // Update stored panning offset
+                panOffset.X += offset.X;
+                panOffset.Y += offset.Y;
+                
+                // Get available space
+                var mainGrid = (Grid)Content;
+                double availableWidth = (mainGrid.ColumnDefinitions[0].ActualWidth - 20);
+                double availableHeight = (mainGrid.RowDefinitions[1].ActualHeight - 20);
+
+                // Apply boundary constraints to the final position
+                panOffset.X = EnforcePanningBoundaryX(panOffset.X, availableWidth);
+                panOffset.Y = EnforcePanningBoundaryY(panOffset.Y, availableHeight);
+                
+                // Release the mouse capture
+                imageCanvas.ReleaseMouseCapture();
+                imageCanvas.Cursor = Cursors.Arrow;
+                e.Handled = true;
+                return;
+            }
+
+            if (isTrackingPixel)
+            {
+                // Stop tracking pixel movement
+                isTrackingPixel = false;
+
+                // Keep pixel location display visible
+                if (pixelLocationDisplay != null)
+                {
+                    pixelLocationDisplay.Show();
+                }
+
+                // Update the JsonDataEntryControl with the final location
+                jsonDataEntry.SetCurrentLocation(currentPixelLocation);
+
+                // Update the visual marker for the selected sprite
+                UpdateSelectedSpriteMarker();
             }
         }
 
@@ -525,41 +643,6 @@ namespace ATLASPlotterJSON
                     handle.UpdatePosition(zoomLevel);
                 }
             }
-        }
-
-        /// <summary>
-        /// Event handler for mouse button release on the image canvas
-        /// Finalizes sprite placement after mouse tracking
-        /// </summary>
-        private void imageCanvas_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            if (isTrackingPixel)
-            {
-                // Stop tracking pixel movement
-                isTrackingPixel = false;
-
-                // Keep pixel location display visible
-                if (pixelLocationDisplay != null)
-                {
-                    pixelLocationDisplay.Show();
-                }
-
-                // COMPONENT CONNECTION:
-                // Update the JsonDataEntryControl with the final location
-                jsonDataEntry.SetCurrentLocation(currentPixelLocation);
-
-                // Update the visual marker for the selected sprite
-                UpdateSelectedSpriteMarker();
-            }
-        }
-
-        /// <summary>
-        /// Legacy method kept for compatibility with older code
-        /// No longer used in current version
-        /// </summary>
-        private void btnAddSelection_Click(object sender, RoutedEventArgs e)
-        {
-            // Not needed with the new approach
         }
 
         /// <summary>
@@ -726,7 +809,7 @@ namespace ATLASPlotterJSON
         }
 
         /// <summary>
-        /// Updates the image scaling to fill the available space
+        /// Updates the image display to show it at 1:1 scale
         /// and repositions all UI elements accordingly
         /// </summary>
         private void UpdateImageScaling()
@@ -740,31 +823,53 @@ namespace ATLASPlotterJSON
             double availableWidth = (mainGrid.ColumnDefinitions[0].ActualWidth - 20);
             double availableHeight = (mainGrid.RowDefinitions[1].ActualHeight - 20);
 
-            // Calculate the scaling factor to fit the image in the available space
-            double scaleX = availableWidth / loadedImage.Width;
-            double scaleY = availableHeight / loadedImage.Height;
-            double scale = Math.Min(scaleX, scaleY);
-
-            // Set the canvas and image dimensions
+            // Set the canvas dimensions to match available space
             imageCanvas.Width = availableWidth;
             imageCanvas.Height = availableHeight;
-            displayImage.Width = loadedImage.Width * scale;
-            displayImage.Height = loadedImage.Height * scale;
 
-            // Center the image in the available space
-            Canvas.SetLeft(displayImage, (availableWidth - displayImage.Width) / 2);
-            Canvas.SetTop(displayImage, (availableHeight - displayImage.Height) / 2);
+            // Use 1:1 pixel ratio (actual size) instead of scaling to fit
+            displayImage.Width = loadedImage.Width;
+            displayImage.Height = loadedImage.Height;
 
-            // Update the pixel location display and sprite markers
+            // Apply any existing pan offset, or center the image if it fits within the canvas
+            double leftPosition = panOffset.X;
+            double topPosition = panOffset.Y;
+
+            // If the image is smaller than the canvas, center it
+            if (displayImage.Width < availableWidth)
+            {
+                leftPosition = (availableWidth - displayImage.Width) / 2;
+                panOffset.X = leftPosition; // Save the centered position
+            }
+            
+            if (displayImage.Height < availableHeight)
+            {
+                topPosition = (availableHeight - displayImage.Height) / 2;
+                panOffset.Y = topPosition; // Save the centered position
+            }
+
+            // Apply boundary constraints to prevent panning beyond the image edges
+            leftPosition = EnforcePanningBoundaryX(leftPosition, availableWidth);
+            topPosition = EnforcePanningBoundaryY(topPosition, availableHeight);
+            
+            // Update the stored pan offset
+            panOffset.X = leftPosition;
+            panOffset.Y = topPosition;
+
+            // Position the image according to the pan offset
+            Canvas.SetLeft(displayImage, leftPosition);
+            Canvas.SetTop(displayImage, topPosition);
+
+            // Update the pixel location display
             if (pixelLocationDisplay != null && pixelLocationDisplay.Visibility == Visibility.Visible)
             {
                 pixelLocationDisplay.UpdatePosition(pixelLocationDisplay.CurrentLocation);
             }
 
-            // Update all sprite markers to match new scaling
+            // Update all sprite markers to match the new positioning
             foreach (var marker in spriteMarkers.Values)
             {
-                // Update the marker's position with the new scaling
+                // Update the marker's position
                 marker.UpdatePosition();
                 
                 // Also update appearance to ensure selected state is correctly displayed
@@ -773,6 +878,109 @@ namespace ATLASPlotterJSON
             
             // Update any selection handles
             UpdateHandlePositions();
+        }
+
+        /// <summary>
+        /// Ensures the X panning position stays within valid boundaries
+        /// </summary>
+        private double EnforcePanningBoundaryX(double positionX, double availableWidth)
+        {
+            if (loadedImage == null) return positionX;
+            
+            // If the image is smaller than the canvas, don't adjust (it will be centered)
+            if (loadedImage.Width <= availableWidth) return positionX;
+            
+            // Enforce left boundary: don't allow panning to show space to the left of the image
+            if (positionX > 0) return 0;
+            
+            // Enforce right boundary: don't allow panning to show space to the right of the image
+            double minX = availableWidth - loadedImage.Width;
+            if (positionX < minX) return minX;
+            
+            return positionX;
+        }
+
+        /// <summary>
+        /// Ensures the Y panning position stays within valid boundaries
+        /// </summary>
+        private double EnforcePanningBoundaryY(double positionY, double availableHeight)
+        {
+            if (loadedImage == null) return positionY;
+            
+            // If the image is smaller than the canvas, don't adjust (it will be centered)
+            if (loadedImage.Height <= availableHeight) return positionY;
+            
+            // Enforce top boundary: don't allow panning to show space above the image
+            if (positionY > 0) return 0;
+            
+            // Enforce bottom boundary: don't allow panning to show space below the image
+            double minY = availableHeight - loadedImage.Height;
+            if (positionY < minY) return minY;
+            
+            return positionY;
+        }
+
+        /// <summary>
+        /// Handles mouse wheel event for easy panning
+        /// </summary>
+        private void imageCanvas_MouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (loadedImage == null) return;
+
+            // Only use mouse wheel for panning if the Ctrl key is pressed
+            if (Keyboard.IsKeyDown(Key.LeftCtrl))
+            {
+                // Get available space
+                var mainGrid = (Grid)Content;
+                double availableWidth = (mainGrid.ColumnDefinitions[0].ActualWidth - 20);
+                double availableHeight = (mainGrid.RowDefinitions[1].ActualHeight - 20);
+
+                // Calculate panning amount based on wheel delta
+                double panAmount = e.Delta / 3.0; // Adjust this value to change pan sensitivity
+                
+                // Calculate new position based on wheel direction
+                // If Shift is held, pan horizontally instead of vertically
+                double newPosX = panOffset.X;
+                double newPosY = panOffset.Y;
+                
+                if (Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift))
+                {
+                    // Pan horizontally
+                    newPosX += panAmount;
+                }
+                else
+                {
+                    // Pan vertically
+                    newPosY += panAmount;
+                }
+
+                // Apply boundary constraints
+                newPosX = EnforcePanningBoundaryX(newPosX, availableWidth);
+                newPosY = EnforcePanningBoundaryY(newPosY, availableHeight);
+
+                // Save the new position
+                panOffset.X = newPosX;
+                panOffset.Y = newPosY;
+                
+                // Update display position
+                Canvas.SetLeft(displayImage, newPosX);
+                Canvas.SetTop(displayImage, newPosY);
+
+                // Update the UI elements
+                if (pixelLocationDisplay != null && pixelLocationDisplay.Visibility == Visibility.Visible)
+                {
+                    pixelLocationDisplay.UpdatePosition(pixelLocationDisplay.CurrentLocation);
+                }
+
+                foreach (var marker in spriteMarkers.Values)
+                {
+                    marker.UpdatePosition();
+                }
+
+                UpdateHandlePositions();
+                
+                e.Handled = true;
+            }
         }
 
         /// <summary>

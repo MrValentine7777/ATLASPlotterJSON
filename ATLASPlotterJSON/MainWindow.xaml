@@ -41,9 +41,10 @@
                 <Canvas x:Name="imageCanvas" Background="Transparent" 
                     MouseLeftButtonDown="imageCanvas_MouseLeftButtonDown" 
                     MouseMove="imageCanvas_MouseMove"
-                    MouseLeftButtonUp="imageCanvas_MouseLeftButtonUp">
+                    MouseLeftButtonUp="imageCanvas_MouseLeftButtonUp"
+                    MouseWheel="imageCanvas_MouseWheel">
                     <Image x:Name="displayImage" RenderOptions.BitmapScalingMode="NearestNeighbor" 
-                       RenderOptions.EdgeMode="Aliased" Stretch="Uniform"/>
+                       RenderOptions.EdgeMode="Aliased" Stretch="None"/>
                 </Canvas>
             </Border>
             
