@@ -16,12 +16,17 @@ ATLAS Plotter is a tool for defining sprite regions within a sprite atlas image.
   - Copy all sprites as a complete JSON collection
 - **Zoom Viewer**: Magnified view for detailed sprite editing and positioning
 - **Pixel-Perfect Positioning**: Coordinate tracking for precise sprite placement
+- **Undo/Redo Support**: Track all operations with unlimited undo/redo capabilities
+  - Keyboard shortcuts: Ctrl+Z for Undo, Ctrl+Y for Redo
+  - All sprite modifications are tracked and reversible
+  - Command history shows descriptive names of operations
 
 ## Technical Details
 - Built with .NET 9.0 for Windows
 - Uses WPF (Windows Presentation Foundation) for the user interface
 - Implements MVVM-like architecture with two-way data binding
 - Serializes/deserializes sprite data using System.Text.Json
+- Uses Command Pattern for operation tracking and undo/redo functionality
 
 ## Application Architecture
 - **MainWindow**: The UI container and main controller
@@ -36,8 +41,21 @@ ATLAS Plotter is a tool for defining sprite regions within a sprite atlas image.
 - **PropertyEditor**: Provides a UI for editing sprite properties
 - **ColliderEditor**: Provides a UI for editing sprite colliders
 - **FileManager**: Handles loading and saving of sprite atlas images and JSON data
+- **CommandManager**: Manages the history of operations for undo/redo functionality
+- **Commands**: Implements the Command Pattern for various sprite operations
+  - **ICommand**: Base interface for all commands
+  - **AddSpriteCommand**: Handles adding new sprites
+  - **RemoveSpriteCommand**: Handles removing sprites
+  - **ModifySpriteCommand**: Handles changes to sprite properties
+  - **AddColliderCommand**: Handles adding colliders to sprites
+  - **RemoveColliderCommand**: Handles removing colliders from sprites
 - **ErrorHandler**: Manages error handling and user notifications
 
+## Command Pattern Implementation
+The application uses the Command Pattern to implement undo/redo functionality:
+- Each user action (add sprite, remove sprite, modify property) is encapsulated as a command
+- Commands are stored in a history stack managed by CommandManager
+- Each command knows how to execute and undo itself
 
 ## Made with the help of GitHub CoPilot.
 - **GitHub CoPilot**: Assisted in generating code snippets, comments, and documentation

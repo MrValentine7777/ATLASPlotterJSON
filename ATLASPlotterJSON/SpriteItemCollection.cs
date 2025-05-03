@@ -83,23 +83,90 @@ namespace ATLASPlotterJSON
         }
 
         /// <summary>
-        /// Adds a new sprite item to the collection with default properties.
-        /// The new sprite is automatically selected after being added.
+        /// Adds a new sprite item to the collection without executing a command.
+        /// Used internally by commands to implement undo/redo.
         /// </summary>
-        /// <remarks>
-        /// This method is called when the user clicks the "Add Sprite" button in JsonDataEntryControl.
-        /// </remarks>
-        public void AddNewItem()
+        /// <returns>The newly created sprite item</returns>
+        internal SpriteItem AddNewItemInternal()
         {
-            // Create a new sprite with default values (size, position, etc.)
+            // Create a new sprite with default values
             var newItem = CreateDefaultSpriteItem();
             
-            // Assign a unique color for this sprite (used in SpriteItemMarker visualization)
+            // Assign a color for this sprite
             AssignRandomColor(newItem.Id);
             
             // Add to the collection and select it
             Items.Add(newItem);
-            SelectedItem = newItem; // This will trigger OnSelectedItemChanged event
+            SelectedItem = newItem;
+            
+            return newItem;
+        }
+
+        /// <summary>
+        /// Adds an existing sprite item to the collection without executing a command.
+        /// Used internally by commands to implement undo/redo.
+        /// </summary>
+        /// <param name="item">The sprite item to add</param>
+        /// <param name="index">Optional index to insert at (default is at the end)</param>
+        internal void AddExistingItemInternal(SpriteItem item, int index = -1)
+        {
+            // Assign a color for this sprite if it doesn't already have one
+            if (!_itemColors.ContainsKey(item.Id))
+            {
+                AssignRandomColor(item.Id);
+            }
+            
+            // Add at specific index or at the end
+            if (index >= 0 && index <= Items.Count)
+            {
+                Items.Insert(index, item);
+            }
+            else
+            {
+                Items.Add(item);
+            }
+            
+            // Select the added item
+            SelectedItem = item;
+        }
+
+        /// <summary>
+        /// Removes a sprite item from the collection without executing a command.
+        /// Used internally by commands to implement undo/redo.
+        /// </summary>
+        /// <param name="item">The sprite item to remove</param>
+        internal void RemoveItemInternal(SpriteItem item)
+        {
+            if (Items.Contains(item))
+            {
+                // Find if this was the selected item
+                bool wasSelected = (SelectedItem == item);
+                
+                // Remove from the collection
+                Items.Remove(item);
+                
+                // Update selection if needed
+                if (wasSelected)
+                {
+                    SelectedItem = Items.Count > 0 ? Items[0] : null!;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Adds a new sprite item to the collection with default properties.
+        /// The new sprite is automatically selected after being added.
+        /// </summary>
+        /// <remarks>
+        /// This method creates and executes an AddSpriteCommand for undo/redo tracking.
+        /// </remarks>
+        public void AddNewItem()
+        {
+            // Create a command for adding a sprite
+            var command = new Commands.AddSpriteCommand(this, null);
+            
+            // Execute the command through the command manager
+            Commands.CommandManager.Instance.ExecuteCommand(command);
         }
 
         /// <summary>
@@ -108,24 +175,17 @@ namespace ATLASPlotterJSON
         /// </summary>
         /// <param name="item">The sprite item to remove</param>
         /// <remarks>
-        /// This method is called when the user clicks the "Remove Sprite" button in JsonDataEntryControl.
+        /// This method creates and executes a RemoveSpriteCommand for undo/redo tracking.
         /// </remarks>
         public void RemoveItem(SpriteItem item)
         {
             if (Items.Contains(item))
             {
-                // Remove the item's assigned color from our tracking dictionary
-                // Using Remove directly instead of ContainsKey check + Remove
-                _itemColors.Remove(item.Id);
+                // Create a command for removing a sprite
+                var command = new Commands.RemoveSpriteCommand(this, item, null, null);
                 
-                // Remove the sprite from the collection
-                Items.Remove(item);
-                
-                // If we removed the currently selected item, select another one if available
-                if (SelectedItem == item)
-                {
-                    SelectedItem = Items.Count > 0 ? Items[0] : null!;
-                }
+                // Execute the command through the command manager
+                Commands.CommandManager.Instance.ExecuteCommand(command);
             }
         }
 

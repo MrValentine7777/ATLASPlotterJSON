@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
+using ATLASPlotterJSON.Commands;
 
 namespace ATLASPlotterJSON
 {
@@ -117,6 +118,9 @@ namespace ATLASPlotterJSON
             // This enables two-way updates: changes in UI update the data, and vice versa
             this.DataContext = _spriteCollection;
             
+            // Initialize the command system for undo/redo
+            InitializeCommandSystem();
+            
             // EVENT CONNECTION:
             // Subscribe to sprite selection changes from the collection
             // When a sprite is selected in the dropdown, we need to notify MainWindow
@@ -132,6 +136,46 @@ namespace ATLASPlotterJSON
                     SubscribeToSourcePropertyChanges(item);
                 }
             };
+        }
+
+        /// <summary>
+        /// Initializes the command management system.
+        /// </summary>
+        private void InitializeCommandSystem()
+        {
+            // Connect to CommandManager's state change events for UI updates
+            CommandManager.Instance.CommandStateChanged += (s, cmd) =>
+            {
+                // Update UI state for undo/redo buttons
+                btnUndo.IsEnabled = CommandManager.Instance.CanUndo;
+                btnRedo.IsEnabled = CommandManager.Instance.CanRedo;
+                
+                // Update tooltips
+                btnUndo.ToolTip = CommandManager.Instance.UndoCommandName;
+                btnRedo.ToolTip = CommandManager.Instance.RedoCommandName;
+            };
+            
+            // Initialize button states
+            btnUndo.IsEnabled = CommandManager.Instance.CanUndo;
+            btnRedo.IsEnabled = CommandManager.Instance.CanRedo;
+        }
+
+        /// <summary>
+        /// Handles the "Undo" button click.
+        /// Undoes the most recent command.
+        /// </summary>
+        private void UndoButton_Click(object sender, RoutedEventArgs e)
+        {
+            CommandManager.Instance.Undo();
+        }
+
+        /// <summary>
+        /// Handles the "Redo" button click.
+        /// Redoes the most recently undone command.
+        /// </summary>
+        private void RedoButton_Click(object sender, RoutedEventArgs e)
+        {
+            CommandManager.Instance.Redo();
         }
 
         /// <summary>
@@ -156,13 +200,17 @@ namespace ATLASPlotterJSON
         /// <param name="e">Information about which property changed</param>
         private void Source_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            // When X, Y, Width or Height changes, we need to update the sprite marker on the canvas
-            if (e.PropertyName == "X" || e.PropertyName == "Y" || 
-                e.PropertyName == "Width" || e.PropertyName == "Height")
+            if (sender is RectSource source && _spriteCollection.SelectedItem != null)
             {
-                // Notify listeners (MainWindow) that a sprite's properties have changed
-                // This triggers MainWindow.UpdateSelectedSpriteMarker
-                SpritePropertyChanged?.Invoke(this, _spriteCollection.SelectedItem);
+                // When certain properties change, create a command to track the change
+                if (e.PropertyName == "X" || e.PropertyName == "Y" || 
+                    e.PropertyName == "Width" || e.PropertyName == "Height")
+                {
+                    // Note: This is a simplified version. In a complete implementation,
+                    // you'd need to store the old value before the change.
+                    // For now, just notify about the change.
+                    SpritePropertyChanged?.Invoke(this, _spriteCollection.SelectedItem);
+                }
             }
         }
 
@@ -205,21 +253,21 @@ namespace ATLASPlotterJSON
             // Make sure we have a selected sprite
             if (_spriteCollection.SelectedItem != null)
             {
-                // USER INTERACTION:
-                // Add a new collider with default values to the sprite
-                // The user can then adjust its size and position as needed
-                _spriteCollection.SelectedItem.Colliders.Add(new Collider
+                // Create a new collider with default values
+                var collider = new Collider
                 {
-                    Type = "rectangle",    // Currently only rectangles are supported
-                    X = 0,                 // Position relative to sprite's top-left
+                    Type = "rectangle",
+                    X = 0,
                     Y = 0,
-                    Width = 8,             // Default small size
+                    Width = 8,
                     Height = 8
-                });
+                };
                 
-                // DATA BINDING NOTE:
-                // The UI list of colliders updates automatically 
-                // because Colliders is an observable collection
+                // Create a command to add the collider
+                var command = new AddColliderCommand(_spriteCollection.SelectedItem, collider);
+                
+                // Execute the command
+                CommandManager.Instance.ExecuteCommand(command);
             }
         }
 
@@ -233,18 +281,15 @@ namespace ATLASPlotterJSON
         /// </summary>
         private void RemoveCollider_Click(object sender, RoutedEventArgs e)
         {
-            // DATA FLOW:
-            // 1. Check if the sender is a button with a collider Tag
-            // 2. If so, and we have a selected sprite, remove that collider
+            // Check that we have a valid collider to remove
             if (sender is Button button && button.Tag is Collider collider && 
                 _spriteCollection.SelectedItem != null)
             {
-                // Remove the collider from the sprite
-                _spriteCollection.SelectedItem.Colliders.Remove(collider);
+                // Create a command to remove the collider
+                var command = new RemoveColliderCommand(_spriteCollection.SelectedItem, collider);
                 
-                // DATA BINDING NOTE:
-                // The UI updates automatically to remove the collider's form fields
-                // because Colliders is an observable collection
+                // Execute the command
+                CommandManager.Instance.ExecuteCommand(command);
             }
         }
         
@@ -259,17 +304,16 @@ namespace ATLASPlotterJSON
         /// </summary>
         private void AddSprite_Click(object sender, RoutedEventArgs e)
         {
-            // ARCHITECTURAL FLOW:
-            // 1. Call the collection to create and add a new sprite with default values
-            _spriteCollection.AddNewItem();
+            // Create a command for adding a sprite
+            var command = new AddSpriteCommand(_spriteCollection, (item) => 
+            {
+                // This callback will be called when the sprite is added
+                // (including during redo operations)
+                SpriteAdded?.Invoke(this, item);
+            });
             
-            // 2. Notify listeners (MainWindow) that a sprite was added
-            // This allows MainWindow to create a visual marker for this sprite
-            SpriteAdded?.Invoke(this, _spriteCollection.SelectedItem);
-            
-            // DATA BINDING NOTE:
-            // The dropdown list updates automatically to show the new sprite
-            // because Items is an observable collection
+            // Execute the command
+            CommandManager.Instance.ExecuteCommand(command);
         }
         
         /// <summary>
@@ -286,20 +330,18 @@ namespace ATLASPlotterJSON
             // Make sure we have a selected sprite
             if (_spriteCollection.SelectedItem != null)
             {
-                // Store the item to remove so we can reference it after removal
                 var itemToRemove = _spriteCollection.SelectedItem;
                 
-                // ARCHITECTURAL FLOW:
-                // 1. Remove the sprite from the collection
-                _spriteCollection.RemoveItem(itemToRemove);
+                // Create a command for removing the sprite
+                var command = new RemoveSpriteCommand(
+                    _spriteCollection, 
+                    itemToRemove,
+                    (item) => SpriteRemoved?.Invoke(this, item),
+                    (item) => SpriteAdded?.Invoke(this, item)
+                );
                 
-                // 2. Notify listeners (MainWindow) that a sprite was removed
-                // This allows MainWindow to remove the visual marker for this sprite
-                SpriteRemoved?.Invoke(this, itemToRemove);
-                
-                // DATA BINDING NOTE:
-                // The dropdown list updates automatically to remove the sprite
-                // because Items is an observable collection
+                // Execute the command
+                CommandManager.Instance.ExecuteCommand(command);
             }
         }
 

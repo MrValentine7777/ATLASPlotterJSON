@@ -99,6 +99,9 @@ namespace ATLASPlotterJSON
             // Initialize the WPF components defined in XAML
             InitializeComponent();
 
+            // Initialize command management system
+            InitializeCommandManagement();
+
             // COMPONENT CONNECTION:
             // Connect to JsonDataEntryControl events to stay synchronized
             // These events notify us when sprites are added, removed, or selected
@@ -119,6 +122,21 @@ namespace ATLASPlotterJSON
             // Set the visibility based on the checkbox
             zoomViewerContainer.Visibility = chkShowZoomViewer.IsChecked == true ? 
                 Visibility.Visible : Visibility.Collapsed;
+        }
+
+        /// <summary>
+        /// Initialize the command management system for the window.
+        /// </summary>
+        private void InitializeCommandManagement()
+        {
+            // Register keyboard shortcuts
+            this.CommandBindings.Add(new CommandBinding(ApplicationCommands.Undo, 
+                (s, e) => Commands.CommandManager.Instance.Undo(),
+                (s, e) => e.CanExecute = Commands.CommandManager.Instance.CanUndo));
+                
+            this.CommandBindings.Add(new CommandBinding(ApplicationCommands.Redo, 
+                (s, e) => Commands.CommandManager.Instance.Redo(),
+                (s, e) => e.CanExecute = Commands.CommandManager.Instance.CanRedo));
         }
 
         /// <summary>
@@ -195,6 +213,9 @@ namespace ATLASPlotterJSON
             {
                 zoomViewer.UpdateContent();
             }
+
+            // Clear command history when loading a new image
+            Commands.CommandManager.Instance.ClearHistory();
         }
 
         /// <summary>

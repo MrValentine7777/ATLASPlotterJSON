@@ -305,6 +305,20 @@
                     Margin="5" Padding="8,3" Click="CopyAllJson_Click"/>
             <Button Content="Load JSON" Margin="5" Padding="8,3" Click="LoadJson_Click"/>
             <Button Content="Save JSON" Margin="5" Padding="8,3" Click="SaveJson_Click"/>
+            <Button x:Name="btnUndo" 
+                    Content="Undo" 
+                    Click="UndoButton_Click"
+                    IsEnabled="False"
+                    ToolTip="Nothing to undo"
+                    Margin="2" 
+                    Padding="5,2" />
+            <Button x:Name="btnRedo" 
+                    Content="Redo" 
+                    Click="RedoButton_Click"
+                    IsEnabled="False"
+                    ToolTip="Nothing to redo"
+                    Margin="2" 
+                    Padding="5,2" />
         </StackPanel>
     </Grid>
 </UserControl>
