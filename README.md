@@ -37,4 +37,4 @@ ATLAS Plotter is a tool for defining sprite regions within a sprite atlas image.
 
 
 ## Made with the help of GitHub CoPilot.
-- GitHub CoPilot**: Assisted in generating code snippets, comments, and documentation
+- **GitHub CoPilot**: Assisted in generating code snippets, comments, and documentation
