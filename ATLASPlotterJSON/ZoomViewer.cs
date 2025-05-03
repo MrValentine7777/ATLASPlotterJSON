@@ -17,7 +17,7 @@ namespace ATLASPlotterJSON
         // Constants for the zoom viewer appearance and behavior
         private const double DEFAULT_HEIGHT = 150.0;
         private const double MIN_ZOOM = 1.0;
-        private const double MAX_ZOOM = 10.0;
+        private const double MAX_ZOOM = 50.0;
         private const double ZOOM_STEP = 0.25;
         private const double BORDER_THICKNESS = 1.0;
 
@@ -30,12 +30,16 @@ namespace ATLASPlotterJSON
         private readonly Image zoomedImage;
         private readonly Rectangle viewportIndicator;
         private readonly StackPanel zoomControls;
+        private readonly TextBlock zoomLevelText;
 
         // Current zoom state
         private double currentZoom = 2.0;
         private Point panOffset = new Point(0, 0);
         private bool isDragging = false;
         private Point lastMousePos;
+
+        // Track whether content is initialized
+        private bool contentInitialized = false;
 
         /// <summary>
         /// Gets the current zoom level of the zoom viewer
@@ -64,13 +68,15 @@ namespace ATLASPlotterJSON
             // Set up the canvas for the zoomed content
             contentCanvas = new Canvas
             {
-                ClipToBounds = true
+                ClipToBounds = true,
+                Background = Brushes.LightGray
             };
 
             // Set up the zoomed image
             zoomedImage = new Image
             {
-                Stretch = Stretch.None
+                Stretch = Stretch.None,
+                RenderTransformOrigin = new Point(0, 0)
             };
 
             // Set attached properties correctly
@@ -107,7 +113,7 @@ namespace ATLASPlotterJSON
 
             // Create zoom buttons
             Button zoomOutBtn = new Button { Content = "-", Width = 24, Padding = new Thickness(0) };
-            TextBlock zoomLevelText = new TextBlock 
+            zoomLevelText = new TextBlock 
             { 
                 Text = $"{currentZoom:F1}×", 
                 VerticalAlignment = VerticalAlignment.Center,
@@ -118,9 +124,9 @@ namespace ATLASPlotterJSON
             Button resetBtn = new Button { Content = "R", Width = 24, Padding = new Thickness(0) };
 
             // Add handlers for zoom buttons
-            zoomOutBtn.Click += (s, e) => AdjustZoom(-ZOOM_STEP, zoomLevelText);
-            zoomInBtn.Click += (s, e) => AdjustZoom(ZOOM_STEP, zoomLevelText);
-            resetBtn.Click += (s, e) => ResetZoom(zoomLevelText);
+            zoomOutBtn.Click += (s, e) => AdjustZoom(-ZOOM_STEP);
+            zoomInBtn.Click += (s, e) => AdjustZoom(ZOOM_STEP);
+            resetBtn.Click += (s, e) => ResetZoom();
 
             // Add controls to the zoom panel
             zoomControls.Children.Add(zoomOutBtn);
@@ -149,19 +155,35 @@ namespace ATLASPlotterJSON
             containerGrid.Children.Add(topPanel);
             containerGrid.Children.Add(contentCanvas);
             
+            // Set border content and add to the main grid
             border.Child = containerGrid;
-
-            // Set the content of this control
-            this.Content = border;
+            mainGrid.Children.Add(border);
+            
+            // Set the content of this control - filling the container
+            this.Content = mainGrid;
+            this.HorizontalAlignment = HorizontalAlignment.Stretch;
+            this.VerticalAlignment = VerticalAlignment.Stretch;
             
             // Set up event handlers for zooming and panning
             contentCanvas.MouseWheel += ContentCanvas_MouseWheel;
             contentCanvas.MouseLeftButtonDown += ContentCanvas_MouseLeftButtonDown;
             contentCanvas.MouseMove += ContentCanvas_MouseMove;
             contentCanvas.MouseLeftButtonUp += ContentCanvas_MouseLeftButtonUp;
+            
+            // Subscribe to size change event to update canvas layout
+            this.SizeChanged += ZoomViewer_SizeChanged;
+        }
 
-            // Initially hide until an image is loaded
-            this.Visibility = Visibility.Collapsed;
+        /// <summary>
+        /// Handle size changed events to update content layout
+        /// </summary>
+        private void ZoomViewer_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            // Update content when the control resizes
+            if (parentWindow.LoadedImage != null && this.Visibility == Visibility.Visible && contentInitialized)
+            {
+                UpdateZoomedContent();
+            }
         }
 
         /// <summary>
@@ -180,6 +202,9 @@ namespace ATLASPlotterJSON
                 // Make the zoom viewer visible
                 this.Visibility = Visibility.Visible;
                 
+                // Mark as initialized
+                contentInitialized = true;
+                
                 // Update the content
                 UpdateZoomedContent();
             }
@@ -187,6 +212,7 @@ namespace ATLASPlotterJSON
             {
                 // Hide if no image is loaded
                 this.Visibility = Visibility.Collapsed;
+                contentInitialized = false;
             }
         }
 
@@ -195,25 +221,51 @@ namespace ATLASPlotterJSON
         /// </summary>
         private void UpdateZoomedContent()
         {
-            if (parentWindow.LoadedImage == null)
+            if (parentWindow.LoadedImage == null || !contentInitialized)
                 return;
 
-            // Calculate the scale factor based on the zoom level
-            double scaleFactor = currentZoom;
-            
-            // Set the size of the zoomed image
-            zoomedImage.Width = parentWindow.LoadedImage.Width * scaleFactor;
-            zoomedImage.Height = parentWindow.LoadedImage.Height * scaleFactor;
-            
-            // Position the image with pan offset
-            Canvas.SetLeft(zoomedImage, -panOffset.X * scaleFactor);
-            Canvas.SetTop(zoomedImage, -panOffset.Y * scaleFactor);
-            
-            // Update viewport indicator to show the visible area in the main view
-            UpdateViewportIndicator();
-            
-            // Update markers within the zoom viewer
-            UpdateMarkers();
+            // Ensure canvas fills the available space
+            if (contentCanvas.ActualWidth <= 0 || contentCanvas.ActualHeight <= 0)
+            {
+                // Wait for layout to complete if dimensions are not valid
+                Dispatcher.BeginInvoke(new Action(() => UpdateZoomedContent()), 
+                    System.Windows.Threading.DispatcherPriority.ContextIdle);
+                return;
+            }
+
+            try
+            {
+                // Create a transform group for combined scaling and translation
+                TransformGroup transformGroup = new TransformGroup();
+                
+                // Add scale transform
+                ScaleTransform scaleTransform = new ScaleTransform(currentZoom, currentZoom);
+                transformGroup.Children.Add(scaleTransform);
+                
+                // Add translation transform for panning
+                TranslateTransform translateTransform = new TranslateTransform(
+                    -panOffset.X * currentZoom, 
+                    -panOffset.Y * currentZoom);
+                transformGroup.Children.Add(translateTransform);
+                
+                // Apply the transform
+                zoomedImage.RenderTransform = transformGroup;
+                
+                // Make sure image is sized correctly at its natural size
+                zoomedImage.Width = double.NaN; // Auto
+                zoomedImage.Height = double.NaN; // Auto
+                
+                // Update viewport indicator to show the visible area in the main view
+                UpdateViewportIndicator();
+                
+                // Update markers within the zoom viewer
+                UpdateMarkers();
+            }
+            catch (Exception ex)
+            {
+                // Handle any exceptions during rendering
+                System.Diagnostics.Debug.WriteLine($"Error in UpdateZoomedContent: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -225,18 +277,32 @@ namespace ATLASPlotterJSON
                 return;
 
             // Calculate main view scale
-            double mainScaleX = parentWindow.DisplayImage.Width / parentWindow.LoadedImage.Width;
-            double mainScaleY = parentWindow.DisplayImage.Height / parentWindow.LoadedImage.Height;
+            double mainScaleX = parentWindow.DisplayImage.Width / parentWindow.LoadedImage.PixelWidth;
+            double mainScaleY = parentWindow.DisplayImage.Height / parentWindow.LoadedImage.PixelHeight;
 
             // Calculate visible area
             double visibleWidth = contentCanvas.ActualWidth / currentZoom;
             double visibleHeight = contentCanvas.ActualHeight / currentZoom;
 
-            // Position and size the viewport indicator
-            Canvas.SetLeft(viewportIndicator, (panOffset.X * currentZoom));
-            Canvas.SetTop(viewportIndicator, (panOffset.Y * currentZoom));
-            viewportIndicator.Width = visibleWidth * currentZoom;
-            viewportIndicator.Height = visibleHeight * currentZoom;
+            // Create a transform group for the viewport indicator
+            TransformGroup transformGroup = new TransformGroup();
+            
+            // Add scale transform
+            ScaleTransform scaleTransform = new ScaleTransform(currentZoom, currentZoom);
+            transformGroup.Children.Add(scaleTransform);
+            
+            // Add translation transform for panning
+            TranslateTransform translateTransform = new TranslateTransform(
+                panOffset.X * currentZoom, 
+                panOffset.Y * currentZoom);
+            transformGroup.Children.Add(translateTransform);
+            
+            // Apply the transform
+            viewportIndicator.RenderTransform = transformGroup;
+            
+            // Size the viewport indicator
+            viewportIndicator.Width = visibleWidth;
+            viewportIndicator.Height = visibleHeight;
             
             // Show the viewport indicator
             viewportIndicator.Visibility = Visibility.Visible;
@@ -275,21 +341,33 @@ namespace ATLASPlotterJSON
                 // Create a new rectangle for the marker
                 var rect = new Rectangle
                 {
-                    Width = width * currentZoom,
-                    Height = height * currentZoom,
+                    Width = width,
+                    Height = height,
                     Stroke = new SolidColorBrush(marker.MarkerColor),
-                    StrokeThickness = 1,
+                    StrokeThickness = 1 / currentZoom,  // Scale stroke thickness
                     Fill = new SolidColorBrush(Color.FromArgb(30, 
                         marker.MarkerColor.R, 
                         marker.MarkerColor.G, 
                         marker.MarkerColor.B))
                 };
-
-                // Position the marker in the zoomed view
-                Canvas.SetLeft(rect, (x - panOffset.X) * currentZoom);
-                Canvas.SetTop(rect, (y - panOffset.Y) * currentZoom);
                 
-                // Add to the canvas (under the viewport indicator)
+                // Create a transform group for the marker
+                TransformGroup transformGroup = new TransformGroup();
+                
+                // Add scale transform
+                ScaleTransform scaleTransform = new ScaleTransform(currentZoom, currentZoom);
+                transformGroup.Children.Add(scaleTransform);
+                
+                // Add translation transform for position
+                TranslateTransform translateTransform = new TranslateTransform(
+                    (x - panOffset.X) * currentZoom, 
+                    (y - panOffset.Y) * currentZoom);
+                transformGroup.Children.Add(translateTransform);
+                
+                // Apply the transform
+                rect.RenderTransform = transformGroup;
+                
+                // Add to the canvas
                 contentCanvas.Children.Insert(contentCanvas.Children.IndexOf(viewportIndicator), rect);
             }
         }
@@ -297,7 +375,7 @@ namespace ATLASPlotterJSON
         /// <summary>
         /// Adjusts the zoom level by the specified step
         /// </summary>
-        private void AdjustZoom(double zoomStep, TextBlock zoomText)
+        private void AdjustZoom(double zoomStep)
         {
             // Calculate new zoom level
             double newZoom = Math.Clamp(currentZoom + zoomStep, MIN_ZOOM, MAX_ZOOM);
@@ -305,8 +383,21 @@ namespace ATLASPlotterJSON
             // Update zoom if changed
             if (Math.Abs(newZoom - currentZoom) > 0.01)
             {
+                // Store the center point of the current view to maintain focus
+                Point centerPoint = new Point(
+                    panOffset.X + (contentCanvas.ActualWidth / 2) / currentZoom,
+                    panOffset.Y + (contentCanvas.ActualHeight / 2) / currentZoom
+                );
+                
+                // Update zoom level
                 currentZoom = newZoom;
-                zoomText.Text = $"{currentZoom:F1}×";
+                zoomLevelText.Text = $"{currentZoom:F1}×";
+                
+                // Adjust pan offset to keep the center point focused
+                panOffset = new Point(
+                    centerPoint.X - (contentCanvas.ActualWidth / 2) / currentZoom,
+                    centerPoint.Y - (contentCanvas.ActualHeight / 2) / currentZoom
+                );
                 
                 // Update the zoomed content
                 UpdateZoomedContent();
@@ -316,10 +407,10 @@ namespace ATLASPlotterJSON
         /// <summary>
         /// Resets zoom to default and centers the view
         /// </summary>
-        private void ResetZoom(TextBlock zoomText)
+        private void ResetZoom()
         {
             ResetZoomAndPan();
-            zoomText.Text = $"{currentZoom:F1}×";
+            zoomLevelText.Text = $"{currentZoom:F1}×";
         }
 
         /// <summary>
@@ -337,14 +428,37 @@ namespace ATLASPlotterJSON
         /// </summary>
         private void ContentCanvas_MouseWheel(object sender, MouseWheelEventArgs e)
         {
+            // Store mouse position before zoom
+            Point mousePos = e.GetPosition(contentCanvas);
+            
+            // Convert to image coordinates
+            Point mouseImagePos = new Point(
+                panOffset.X + mousePos.X / currentZoom,
+                panOffset.Y + mousePos.Y / currentZoom
+            );
+            
             // Get zoom step based on wheel direction
             double step = e.Delta > 0 ? ZOOM_STEP : -ZOOM_STEP;
             
-            // Get the zoom text block for updating
-            TextBlock zoomText = zoomControls.Children[1] as TextBlock;
+            // Calculate new zoom level
+            double newZoom = Math.Clamp(currentZoom + step, MIN_ZOOM, MAX_ZOOM);
             
-            // Adjust zoom
-            AdjustZoom(step, zoomText);
+            // Only proceed if zoom actually changed
+            if (Math.Abs(newZoom - currentZoom) > 0.01)
+            {
+                // Update zoom level
+                currentZoom = newZoom;
+                zoomLevelText.Text = $"{currentZoom:F1}×";
+                
+                // Calculate how to adjust pan offset to zoom toward mouse position
+                panOffset = new Point(
+                    mouseImagePos.X - mousePos.X / currentZoom,
+                    mouseImagePos.Y - mousePos.Y / currentZoom
+                );
+                
+                // Update the zoomed content
+                UpdateZoomedContent();
+            }
             
             // Mark event as handled
             e.Handled = true;
@@ -375,7 +489,7 @@ namespace ATLASPlotterJSON
                 // Calculate drag delta
                 Vector delta = currentMousePos - lastMousePos;
                 
-                // Update pan offset
+                // Update pan offset - convert screen pixels to image coordinates
                 panOffset = new Point(
                     panOffset.X - delta.X / currentZoom,
                     panOffset.Y - delta.Y / currentZoom

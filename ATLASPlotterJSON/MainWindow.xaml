@@ -33,7 +33,7 @@
         <Grid Grid.Row="1" Grid.Column="0" Margin="10">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto" x:Name="zoomViewerRow"/>
+                <RowDefinition Height="150" x:Name="zoomViewerRow" MinHeight="100"/>
             </Grid.RowDefinitions>
             
             <!-- Main Image Canvas -->
@@ -47,11 +47,11 @@
                 </Canvas>
             </Border>
             
-            <!-- Zoom Viewer will be placed here programmatically -->
+            <!-- Zoom Viewer Container -->
             <Border x:Name="zoomViewerContainer" Grid.Row="1" 
                     BorderBrush="Gray" BorderThickness="1" 
-                    Background="#FFE5E5E5" Visibility="Collapsed"
-                    Margin="0,5,0,0" Height="150"/>
+                    Background="#FFE5E5E5" Visibility="Visible"
+                    Margin="0,5,0,0"/>
         </Grid>
 
         <!-- JSON Data Entry Panel -->

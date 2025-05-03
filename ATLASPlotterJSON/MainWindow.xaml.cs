@@ -112,11 +112,13 @@ namespace ATLASPlotterJSON
 
             // Initialize the zoom viewer
             zoomViewer = new ZoomViewer(this);
-            imageCanvas.Children.Add(zoomViewer);
-            zoomViewer.Visibility = chkShowZoomViewer.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
 
-            // Ensure the zoom viewer is on top of all other elements
-            Panel.SetZIndex(zoomViewer, 1000);
+            // Set the zoom viewer as the child of the zoomViewerContainer instead of adding to imageCanvas
+            zoomViewerContainer.Child = zoomViewer;
+
+            // Set the visibility based on the checkbox
+            zoomViewerContainer.Visibility = chkShowZoomViewer.IsChecked == true ? 
+                Visibility.Visible : Visibility.Collapsed;
         }
 
         /// <summary>
@@ -187,6 +189,12 @@ namespace ATLASPlotterJSON
 
             // Update the scaling to fit the image in the available space
             UpdateImageScaling();
+            
+            // Update the zoom viewer with the loaded image if it's visible
+            if (zoomViewer != null && chkShowZoomViewer.IsChecked == true)
+            {
+                zoomViewer.UpdateContent();
+            }
         }
 
         /// <summary>
@@ -747,9 +755,9 @@ namespace ATLASPlotterJSON
         {
             if (zoomViewer != null)
             {
-                // Show or hide the zoom viewer based on checkbox state
-                zoomViewer.Visibility = chkShowZoomViewer.IsChecked == false ? 
-                    Visibility.Collapsed : Visibility.Visible;
+                // Show or hide the zoom viewer container based on checkbox state
+                zoomViewerContainer.Visibility = chkShowZoomViewer.IsChecked == true ? 
+                    Visibility.Visible : Visibility.Collapsed;
                     
                 // Update the zoom viewer content if it's becoming visible
                 if (chkShowZoomViewer.IsChecked == true && loadedImage != null)
