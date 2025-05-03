@@ -42,9 +42,6 @@ namespace ATLASPlotterJSON
         /// <summary>The loaded sprite atlas image</summary>
         private BitmapImage? loadedImage;
 
-        /// <summary>Legacy collection for atlas items (mostly replaced by SpriteCollection)</summary>
-        private readonly List<AtlasItem> atlasItems = [];
-
         /// <summary>Path to the currently loaded image file</summary>
         private string? imagePath;
 
@@ -725,9 +722,6 @@ namespace ATLASPlotterJSON
             // Clear all sprite markers
             ClearSpriteMarkers();
 
-            // Clear legacy atlas items
-            atlasItems.Clear();
-
             // Hide the pixel location display
             if (pixelLocationDisplay != null)
             {
@@ -1002,48 +996,5 @@ namespace ATLASPlotterJSON
                 }
             }
         }
-    }
-
-    /// <summary>
-    /// Legacy class representing an individual sprite item in the atlas
-    /// Mostly replaced by the more comprehensive SpriteItem class in JsonDataModels.cs
-    /// Kept for backward compatibility
-    /// </summary>
-    public class AtlasItem
-    {
-        /// <summary>Name of the sprite</summary>
-        public string Name { get; set; } = string.Empty;
-
-        /// <summary>X position within the atlas</summary>
-        public int X { get; set; }
-
-        /// <summary>Y position within the atlas</summary>
-        public int Y { get; set; }
-
-        /// <summary>Width of the sprite in pixels</summary>
-        public int Width { get; set; }
-
-        /// <summary>Height of the sprite in pixels</summary>
-        public int Height { get; set; }
-    }
-
-    /// <summary>
-    /// Legacy class representing the entire sprite atlas
-    /// Mostly replaced by SpriteItemCollection in SpriteItemCollection.cs
-    /// Kept for backward compatibility
-    /// </summary>
-    public class Atlas
-    {
-        /// <summary>Path to the atlas image file</summary>
-        public string ImagePath { get; set; } = string.Empty;
-
-        /// <summary>Width of the atlas image in pixels</summary>
-        public int ImageWidth { get; set; }
-
-        /// <summary>Height of the atlas image in pixels</summary>
-        public int ImageHeight { get; set; }
-
-        /// <summary>Collection of sprite frames defined in the atlas</summary>
-        public List<AtlasItem> Frames { get; set; } = [];
     }
 }

@@ -37,14 +37,14 @@
             </Grid.RowDefinitions>
             
             <!-- Main Image Canvas -->
-            <Border Grid.Row="0" BorderBrush="Gray" BorderThickness="1" Background="#FFE5E5E5">
+            <Border Grid.Row="0" BorderBrush="Gray" BorderThickness="1" Background="#FFE5E5E5" ClipToBounds="True">
                 <Canvas x:Name="imageCanvas" Background="Transparent" 
                     MouseLeftButtonDown="imageCanvas_MouseLeftButtonDown" 
                     MouseMove="imageCanvas_MouseMove"
                     MouseLeftButtonUp="imageCanvas_MouseLeftButtonUp"
-                    MouseWheel="imageCanvas_MouseWheel">
+                    MouseWheel="imageCanvas_MouseWheel" ClipToBounds="True">
                     <Image x:Name="displayImage" RenderOptions.BitmapScalingMode="NearestNeighbor" 
-                       RenderOptions.EdgeMode="Aliased" Stretch="None"/>
+                       RenderOptions.EdgeMode="Aliased" Stretch="None" SnapsToDevicePixels="False"/>
                 </Canvas>
             </Border>
             

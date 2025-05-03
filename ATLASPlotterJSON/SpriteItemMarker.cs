@@ -163,15 +163,19 @@ namespace ATLASPlotterJSON
                 var image = mainWindow.DisplayImage;
                 
                 // Calculate how much the image has been scaled to fit in the window
-                scaleX = image.Width / mainWindow.LoadedImage.Width;
-                scaleY = image.Height / mainWindow.LoadedImage.Height;
+                // For accurate pixel mapping, use PixelWidth and PixelHeight
+                scaleX = image.Width / mainWindow.LoadedImage.PixelWidth;
+                scaleY = image.Height / mainWindow.LoadedImage.PixelHeight;
                 
                 // Get the offset of the image within the canvas
                 offsetX = Canvas.GetLeft(image);
                 offsetY = Canvas.GetTop(image);
+                
+                // Debug output to see actual scaling factors
+                // Console.WriteLine($"Marker scaling: {scaleX}x{scaleY}, Image size: {mainWindow.LoadedImage.PixelWidth}x{mainWindow.LoadedImage.PixelHeight}");
             }
             
-            // Calculate the display position on the scaled canvas
+            // Calculate the display position on the canvas
             // This maps our sprite's actual pixel coordinates to the scaled and offset position on screen
             double displayX = spriteItem.Source.X * scaleX + offsetX;
             double displayY = spriteItem.Source.Y * scaleY + offsetY;
