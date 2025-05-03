@@ -99,6 +99,16 @@ namespace ATLASPlotterJSON
         public Image DisplayImage => displayImage;
 
         /// <summary>
+        /// Gets the main image canvas for external access
+        /// </summary>
+        public Canvas MainImageCanvas => this.imageCanvas;
+
+        /// <summary>
+        /// Event fired when sprite markers are updated
+        /// </summary>
+        public event EventHandler MarkersUpdated;
+
+        /// <summary>
         /// Initialize the main application window
         /// </summary>
         public MainWindow()
@@ -382,6 +392,9 @@ namespace ATLASPlotterJSON
         {
             // Update the sprite's visual representation
             UpdateSelectedSpriteMarker();
+            
+            // Notify listeners that markers have been updated
+            MarkersUpdated?.Invoke(this, EventArgs.Empty);
         }
 
         /// <summary>
@@ -751,6 +764,9 @@ namespace ATLASPlotterJSON
 
                 // Recreate all markers for existing sprites
                 CreateMarkersForExistingSprites();
+
+                // Notify listeners that markers have been updated
+                MarkersUpdated?.Invoke(this, EventArgs.Empty);
 
                 // Show a success message
                 tbSelectionInfo.Text = $"Successfully updated {spriteMarkers.Count} sprite markers.";

@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Collections.Generic;
+using System.Windows.Threading;
 
 namespace ATLASPlotterJSON
 {
@@ -16,7 +17,6 @@ namespace ATLASPlotterJSON
     public class ZoomViewer : UserControl
     {
         // Constants for the zoom viewer appearance and behavior
-        private const double DEFAULT_HEIGHT = 150.0;
         private const double MIN_ZOOM = 1.0;
         private const double MAX_ZOOM = 50.0;
         private const double ZOOM_STEP = 0.25;
@@ -43,8 +43,11 @@ namespace ATLASPlotterJSON
         // Track whether content is initialized
         private bool contentInitialized = false;
 
-        // Dictionary to track SpriteItemMarkers in the zoom viewer
-        private readonly Dictionary<int, SpriteItemMarker> zoomMarkers = new Dictionary<int, SpriteItemMarker>();
+        // Combined image with markers
+        private WriteableBitmap combinedImageBitmap;
+        
+        // Timer for delayed refresh
+        private readonly DispatcherTimer refreshTimer;
 
         /// <summary>
         /// Gets the current zoom level of the zoom viewer
@@ -120,13 +123,14 @@ namespace ATLASPlotterJSON
             Button zoomOutBtn = new Button { Content = "-", Width = 24, Padding = new Thickness(0) };
             zoomLevelText = new TextBlock 
             { 
-                Text = $"{currentZoom:F1}×", 
+                Text = $"{currentZoom:F1}Ã—", 
                 VerticalAlignment = VerticalAlignment.Center,
                 Width = 35,
                 TextAlignment = TextAlignment.Center
             };
             Button zoomInBtn = new Button { Content = "+", Width = 24, Padding = new Thickness(0) };
             Button resetBtn = new Button { Content = "R", Width = 24, Padding = new Thickness(0) };
+            
             // Add a new button specifically for 1:1 pixel match
             Button oneToOneBtn = new Button { 
                 Content = "1:1", 
@@ -135,11 +139,20 @@ namespace ATLASPlotterJSON
                 ToolTip = "Set to exact 1:1 pixel match"
             };
 
+            // Add refresh button for updating the captured image
+            Button refreshBtn = new Button { 
+                Content = "â†»", 
+                Width = 24, 
+                Padding = new Thickness(0),
+                ToolTip = "Refresh zoom view" 
+            };
+
             // Add handlers for zoom buttons
             zoomOutBtn.Click += (s, e) => AdjustZoom(-ZOOM_STEP);
             zoomInBtn.Click += (s, e) => AdjustZoom(ZOOM_STEP);
             resetBtn.Click += (s, e) => ResetZoom();
             oneToOneBtn.Click += (s, e) => SetOneToOneZoom();
+            refreshBtn.Click += (s, e) => UpdateCombinedImage();
 
             // Add controls to the zoom panel
             zoomControls.Children.Add(zoomOutBtn);
@@ -147,6 +160,7 @@ namespace ATLASPlotterJSON
             zoomControls.Children.Add(zoomInBtn);
             zoomControls.Children.Add(oneToOneBtn); // Add the new 1:1 button
             zoomControls.Children.Add(resetBtn);
+            zoomControls.Children.Add(refreshBtn);  // Add refresh button
 
             // Add components to the canvas
             contentCanvas.Children.Add(zoomedImage);
@@ -186,6 +200,33 @@ namespace ATLASPlotterJSON
             
             // Subscribe to size change event to update canvas layout
             this.SizeChanged += ZoomViewer_SizeChanged;
+            
+            // Subscribe to parent window's event for marker updates
+            if (parentWindow != null)
+            {
+                parentWindow.MarkersUpdated += ParentWindow_MarkersUpdated;
+            }
+            
+            // Initialize refresh timer
+            refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+            refreshTimer.Tick += (s, e) => {
+                refreshTimer.Stop();
+                UpdateCombinedImage();
+            };
+        }
+
+        /// <summary>
+        /// Event handler for when markers are updated in the main window
+        /// Schedules a refresh with a small delay to ensure UI is updated
+        /// </summary>
+        private void ParentWindow_MarkersUpdated(object sender, EventArgs e)
+        {
+            if (this.Visibility == Visibility.Visible && contentInitialized)
+            {
+                // Use timer to prevent multiple refreshes when rapidly updating markers
+                refreshTimer.Stop();
+                refreshTimer.Start();
+            }
         }
 
         /// <summary>
@@ -195,15 +236,15 @@ namespace ATLASPlotterJSON
         {
             // Set zoom to exactly 1.0 for pixel-perfect display
             currentZoom = 1.0;
-            zoomLevelText.Text = "1.0×";
+            zoomLevelText.Text = "1.0Ã—";
             
             // Center view if needed
-            if (parentWindow.LoadedImage != null)
+            if (combinedImageBitmap != null)
             {
                 // Center the current view on the image
                 Point centerPoint = new Point(
-                    parentWindow.LoadedImage.PixelWidth / 2,
-                    parentWindow.LoadedImage.PixelHeight / 2
+                    combinedImageBitmap.PixelWidth / 2,
+                    combinedImageBitmap.PixelHeight / 2
                 );
                 
                 // Calculate new pan offset to center on this point
@@ -222,7 +263,7 @@ namespace ATLASPlotterJSON
         private void ZoomViewer_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             // Update content when the control resizes
-            if (parentWindow.LoadedImage != null && this.Visibility == Visibility.Visible && contentInitialized)
+            if (combinedImageBitmap != null && this.Visibility == Visibility.Visible && contentInitialized)
             {
                 UpdateZoomedContent();
             }
@@ -235,8 +276,8 @@ namespace ATLASPlotterJSON
         {
             if (parentWindow.LoadedImage != null)
             {
-                // Set the image source
-                zoomedImage.Source = parentWindow.LoadedImage;
+                // Create combined image from the main canvas
+                UpdateCombinedImage();
                 
                 // Reset zoom and position
                 ResetZoomAndPan();
@@ -259,11 +300,130 @@ namespace ATLASPlotterJSON
         }
 
         /// <summary>
+        /// Captures the main canvas content (image and markers) into a single bitmap
+        /// </summary>
+        public void UpdateCombinedImage()
+        {
+            if (parentWindow?.LoadedImage == null)
+                return;
+
+            try
+            {
+                // Get the main canvas from parent window
+                var mainCanvas = parentWindow.MainImageCanvas;
+                if (mainCanvas == null)
+                    return;
+
+                // Get the size of the original image
+                int width = parentWindow.LoadedImage.PixelWidth;
+                int height = parentWindow.LoadedImage.PixelHeight;
+                
+                // Create a RenderTargetBitmap to render the entire canvas
+                RenderTargetBitmap renderBitmap = new RenderTargetBitmap(
+                    width, height, 96, 96, PixelFormats.Pbgra32);
+                
+                // Create a DrawingVisual to render the image and markers at original scale
+                DrawingVisual drawingVisual = new DrawingVisual();
+                using (DrawingContext drawingContext = drawingVisual.RenderOpen())
+                {
+                    // First draw the background (original image)
+                    drawingContext.DrawImage(parentWindow.LoadedImage, new Rect(0, 0, width, height));
+                    
+                    // Then draw each marker at its correct position
+                    foreach (var markerPair in parentWindow.spriteMarkers)
+                    {
+                        var marker = markerPair.Value;
+                        var spriteItem = marker.SpriteItem;
+                        
+                        // Draw a rectangle for the sprite
+                        Rect spriteRect = new Rect(
+                            spriteItem.Source.X,
+                            spriteItem.Source.Y,
+                            spriteItem.Source.Width,
+                            spriteItem.Source.Height);
+                        
+                        // Get color and brush for this marker
+                        Color color = marker.MarkerColor;
+                        SolidColorBrush fillBrush = new SolidColorBrush(Color.FromArgb(40, color.R, color.G, color.B));
+                        Pen strokePen = new Pen(new SolidColorBrush(color), 2);
+                        
+                        // If sprite is selected, use a dashed stroke
+                        if (spriteItem == parentWindow.jsonDataEntry.SpriteCollection.SelectedItem)
+                        {
+                            strokePen.DashStyle = new DashStyle(new double[] { 4, 2 }, 0);
+                            strokePen.Thickness = 3;
+                        }
+                        
+                        // Draw the sprite rectangle
+                        drawingContext.DrawRectangle(fillBrush, strokePen, spriteRect);
+                        
+                        // Draw the sprite name text
+                        FormattedText formattedText = new FormattedText(
+                            $"#{spriteItem.Id}: {spriteItem.Name}",
+                            System.Globalization.CultureInfo.CurrentCulture,
+                            FlowDirection.LeftToRight,
+                            new Typeface("Segoe UI"),
+                            12,
+                            new SolidColorBrush(color),
+                            VisualTreeHelper.GetDpi(this).PixelsPerDip);
+                        
+                        // Draw the text background
+                        Rect textRect = new Rect(
+                            spriteItem.Source.X,
+                            spriteItem.Source.Y - formattedText.Height - 2,
+                            formattedText.Width + 8,
+                            formattedText.Height + 4);
+                        
+                        // If sprite is too close to the top, draw the label below it
+                        if (textRect.Y < 0)
+                        {
+                            textRect.Y = spriteItem.Source.Y + spriteItem.Source.Height + 2;
+                        }
+                        
+                        // Draw text background
+                        drawingContext.DrawRectangle(
+                            new SolidColorBrush(Color.FromArgb(180, 0, 0, 0)),
+                            null,
+                            textRect);
+                        
+                        // Draw the text
+                        drawingContext.DrawText(formattedText, new Point(
+                            textRect.X + 4,
+                            textRect.Y + 2));
+                    }
+                }
+                
+                // Render the visual to the bitmap
+                renderBitmap.Render(drawingVisual);
+                
+                // Store the bitmap
+                combinedImageBitmap = new WriteableBitmap(renderBitmap);
+                
+                // Set the image source
+                zoomedImage.Source = combinedImageBitmap;
+                
+                // Force layout update
+                UpdateZoomedContent();
+            }
+            catch (Exception ex)
+            {
+                // Log any errors
+                System.Diagnostics.Debug.WriteLine($"Error capturing combined image: {ex.Message}");
+                
+                // Fallback to just showing the original image without markers
+                if (parentWindow.LoadedImage != null)
+                {
+                    zoomedImage.Source = parentWindow.LoadedImage;
+                }
+            }
+        }
+
+        /// <summary>
         /// Updates the zoomed content based on current zoom level and pan offset
         /// </summary>
         private void UpdateZoomedContent()
         {
-            if (parentWindow.LoadedImage == null || !contentInitialized)
+            if (combinedImageBitmap == null || !contentInitialized)
                 return;
 
             // Ensure canvas fills the available space
@@ -300,9 +460,6 @@ namespace ATLASPlotterJSON
                 
                 // Update viewport indicator to show the visible area in the main view
                 UpdateViewportIndicator();
-                
-                // Update markers within the zoom viewer
-                UpdateMarkers();
             }
             catch (Exception ex)
             {
@@ -316,12 +473,12 @@ namespace ATLASPlotterJSON
         /// </summary>
         private void UpdateViewportIndicator()
         {
-            if (parentWindow.LoadedImage == null || parentWindow.DisplayImage == null)
+            if (combinedImageBitmap == null || parentWindow.DisplayImage == null)
                 return;
 
             // Calculate main view scale using PixelWidth/PixelHeight for consistent scaling
-            double mainScaleX = parentWindow.DisplayImage.Width / parentWindow.LoadedImage.PixelWidth;
-            double mainScaleY = parentWindow.DisplayImage.Height / parentWindow.LoadedImage.PixelHeight;
+            double mainScaleX = parentWindow.DisplayImage.Width / combinedImageBitmap.PixelWidth;
+            double mainScaleY = parentWindow.DisplayImage.Height / combinedImageBitmap.PixelHeight;
 
             // Calculate visible area
             double visibleWidth = contentCanvas.ActualWidth / currentZoom;
@@ -349,73 +506,7 @@ namespace ATLASPlotterJSON
             
             // Show the viewport indicator
             viewportIndicator.Visibility = Visibility.Visible;
-        }
-
-        /// <summary>
-        /// Updates the markers within the zoom viewer to reflect the current zoom level
-        /// using actual SpriteItemMarker instances like the main canvas
-        /// </summary>
-        private void UpdateMarkers()
-        {
-            // First, remove any existing markers from the zoom viewer
-            foreach (var marker in zoomMarkers.Values)
-            {
-                contentCanvas.Children.Remove(marker);
-            }
-            zoomMarkers.Clear();
-
-            // If no image is loaded, return
-            if (parentWindow.LoadedImage == null)
-                return;
-
-            // Create new markers for each sprite using the same SpriteItemMarker class
-            foreach (var mainMarkerPair in parentWindow.spriteMarkers)
-            {
-                // Get the sprite item and marker color
-                var spriteItem = mainMarkerPair.Value.SpriteItem;
-                var color = mainMarkerPair.Value.MarkerColor;
-                
-                // Create a new SpriteItemMarker for the zoom viewer
-                var zoomMarker = new SpriteItemMarker(spriteItem, color);
-                
-                // We need to set a custom ScaleTransform to make the marker work with our zoom level
-                TransformGroup markerTransform = new TransformGroup();
-                
-                // Apply our zoom level
-                ScaleTransform markerScale = new ScaleTransform(currentZoom, currentZoom);
-                markerTransform.Children.Add(markerScale);
-                
-                // Apply translation to account for panning
-                TranslateTransform markerTranslate = new TranslateTransform(
-                    -panOffset.X * currentZoom,
-                    -panOffset.Y * currentZoom);
-                markerTransform.Children.Add(markerTranslate);
-                
-                // Apply the transform directly to the marker
-                zoomMarker.RenderTransform = markerTransform;
-                zoomMarker.RenderTransformOrigin = new Point(0, 0);
-                
-                // Add the marker to the canvas
-                contentCanvas.Children.Add(zoomMarker);
-                
-                // Keep track of it in our local dictionary
-                zoomMarkers[spriteItem.Id] = zoomMarker;
-                
-                // Set appropriate z-index to make sure markers are above the image 
-                // but below the viewport indicator
-                Panel.SetZIndex(zoomMarker, 5);
-                
-                // Connect the zoom marker's selection event to update main window selection
-                zoomMarker.MarkerSelected += (s, e) => {
-                    // Forward the selection to the main window's data entry control
-                    parentWindow.jsonDataEntry.SpriteCollection.SelectedItem = e;
-                };
-                
-                // Update appearance based on selection state
-                bool isSelected = spriteItem == parentWindow.jsonDataEntry.SpriteCollection.SelectedItem;
-                zoomMarker.UpdateAppearance(isSelected);
-            }
-
+            
             // Make sure viewport indicator is at the front
             Panel.SetZIndex(viewportIndicator, 10);
         }
@@ -439,7 +530,7 @@ namespace ATLASPlotterJSON
                 
                 // Update zoom level
                 currentZoom = newZoom;
-                zoomLevelText.Text = $"{currentZoom:F1}×";
+                zoomLevelText.Text = $"{currentZoom:F1}Ã—";
                 
                 // Adjust pan offset to keep the center point focused
                 panOffset = new Point(
@@ -458,7 +549,7 @@ namespace ATLASPlotterJSON
         private void ResetZoom()
         {
             ResetZoomAndPan();
-            zoomLevelText.Text = $"{currentZoom:F1}×";
+            zoomLevelText.Text = $"{currentZoom:F1}Ã—";
         }
 
         /// <summary>
@@ -497,7 +588,7 @@ namespace ATLASPlotterJSON
             {
                 // Update zoom level
                 currentZoom = newZoom;
-                zoomLevelText.Text = $"{currentZoom:F1}×";
+                zoomLevelText.Text = $"{currentZoom:F1}Ã—";
                 
                 // Calculate how to adjust pan offset to zoom toward mouse position
                 panOffset = new Point(
