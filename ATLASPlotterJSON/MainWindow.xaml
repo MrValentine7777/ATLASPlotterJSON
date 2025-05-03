@@ -31,13 +31,8 @@
 
         <!-- Image Display Area -->
         <Grid Grid.Row="1" Grid.Column="0" Margin="10">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="150" x:Name="zoomViewerRow" MinHeight="100"/>
-            </Grid.RowDefinitions>
-            
             <!-- Main Image Canvas -->
-            <Border Grid.Row="0" BorderBrush="Gray" BorderThickness="1" Background="#FFE5E5E5" ClipToBounds="True">
+            <Border BorderBrush="Gray" BorderThickness="1" Background="#FFE5E5E5" ClipToBounds="True">
                 <Canvas x:Name="imageCanvas" Background="Transparent" 
                     MouseLeftButtonDown="imageCanvas_MouseLeftButtonDown" 
                     MouseMove="imageCanvas_MouseMove"
@@ -47,18 +42,26 @@
                        RenderOptions.EdgeMode="Aliased" Stretch="None" SnapsToDevicePixels="False"/>
                 </Canvas>
             </Border>
+        </Grid>
+
+        <!-- Right Side Column - Contains JSON Data Entry and Zoom Viewer -->
+        <Grid Grid.Row="0" Grid.Column="1" Grid.RowSpan="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="200" MinHeight="150"/>
+            </Grid.RowDefinitions>
             
-            <!-- Zoom Viewer Container -->
+            <!-- JSON Data Entry Panel -->
+            <local:JsonDataEntryControl x:Name="jsonDataEntry" 
+                                       Grid.Row="0"
+                                       Margin="0,10,10,5"/>
+            
+            <!-- Zoom Viewer Container - Now placed below the JSON data entry -->
             <Border x:Name="zoomViewerContainer" Grid.Row="1" 
                     BorderBrush="Gray" BorderThickness="1" 
                     Background="#FFE5E5E5" Visibility="Visible"
-                    Margin="0,5,0,0"/>
+                    Margin="0,5,10,10"/>
         </Grid>
-
-        <!-- JSON Data Entry Panel -->
-        <local:JsonDataEntryControl x:Name="jsonDataEntry" 
-                                   Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" 
-                                   Margin="0,10,10,10"/>
 
         <!-- Status Bar -->
         <StatusBar Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Height="22">
