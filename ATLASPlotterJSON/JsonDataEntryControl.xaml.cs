@@ -50,7 +50,7 @@ namespace ATLASPlotterJSON
         /// 2. This event fires to notify MainWindow
         /// 3. MainWindow updates all SpriteItemMarkers to highlight the selected one
         /// </summary>
-        public event EventHandler<SpriteItem> SelectedSpriteChanged;
+        public event EventHandler<SpriteItem>? SelectedSpriteChanged;
         
         /// <summary>
         /// COMMUNICATION SYSTEM - EVENTS:
@@ -63,8 +63,8 @@ namespace ATLASPlotterJSON
         /// 2. These events fire to notify MainWindow
         /// 3. MainWindow creates/removes SpriteItemMarkers on the canvas
         /// </summary>
-        public event EventHandler<SpriteItem> SpriteAdded;
-        public event EventHandler<SpriteItem> SpriteRemoved;
+        public event EventHandler<SpriteItem>? SpriteAdded;
+        public event EventHandler<SpriteItem>? SpriteRemoved;
 
         /// <summary>
         /// Public access to the sprite collection for other components.

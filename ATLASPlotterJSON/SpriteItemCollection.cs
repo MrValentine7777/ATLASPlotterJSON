@@ -71,7 +71,7 @@ namespace ATLASPlotterJSON
         /// Event required for INotifyPropertyChanged implementation.
         /// This event notifies the UI when properties change so it can update bindings.
         /// </summary>
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         /// <summary>
         /// Constructs a new sprite collection and adds one default item.
@@ -124,7 +124,7 @@ namespace ATLASPlotterJSON
                 // If we removed the currently selected item, select another one if available
                 if (SelectedItem == item)
                 {
-                    SelectedItem = Items.Count > 0 ? Items[0] : null;
+                    SelectedItem = Items.Count > 0 ? Items[0] : null!;
                 }
             }
         }
@@ -247,7 +247,7 @@ namespace ATLASPlotterJSON
         /// This method is called whenever a property changes to notify the UI.
         /// The CallerMemberName attribute automatically provides the calling property's name.
         /// </remarks>
-        protected void OnPropertyChanged([CallerMemberName] string name = null)
+        protected void OnPropertyChanged([CallerMemberName] string? name = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }

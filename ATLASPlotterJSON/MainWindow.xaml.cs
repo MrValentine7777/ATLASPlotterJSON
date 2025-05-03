@@ -88,9 +88,9 @@ namespace ATLASPlotterJSON
             // COMPONENT CONNECTION:
             // Connect to JsonDataEntryControl events to stay synchronized
             // These events notify us when sprites are added, removed, or selected
-            jsonDataEntry.SelectedSpriteChanged += OnSelectedSpriteChanged;
-            jsonDataEntry.SpriteAdded += OnSpriteAdded;
-            jsonDataEntry.SpriteRemoved += OnSpriteRemoved;
+            jsonDataEntry.SelectedSpriteChanged += OnSelectedSpriteChanged!;
+            jsonDataEntry.SpriteAdded += OnSpriteAdded!;
+            jsonDataEntry.SpriteRemoved += OnSpriteRemoved!;
 
             // Subscribe to the window size changed event
             SizeChanged += Window_SizeChanged;
@@ -237,7 +237,7 @@ namespace ATLASPlotterJSON
             // COMPONENT CONNECTION:
             // Subscribe to the marker's selection event
             // When a user clicks the marker, this event will fire
-            marker.MarkerSelected += Marker_Selected;
+            marker.MarkerSelected += Marker_Selected!;
 
             // Add the marker to the canvas and tracking dictionary
             imageCanvas.Children.Add(marker);

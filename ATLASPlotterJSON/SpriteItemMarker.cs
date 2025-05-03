@@ -98,7 +98,7 @@ namespace ATLASPlotterJSON
             
             // Subscribe to property changes of the sprite item
             // When the sprite data changes, we need to update our visual representation
-            spriteItem.PropertyChanged += SpriteItem_PropertyChanged;
+            spriteItem.PropertyChanged += SpriteItem_PropertyChanged!;
         }
         
         /// <summary>
@@ -155,7 +155,7 @@ namespace ATLASPlotterJSON
             double offsetY = 0;
             
             // Find MainWindow instance to get scaling factors
-            MainWindow mainWindow = Window.GetWindow(this) as MainWindow;
+            MainWindow? mainWindow = Window.GetWindow(this) as MainWindow;
             if (mainWindow?.LoadedImage != null)
             {
                 var image = mainWindow.DisplayImage;
