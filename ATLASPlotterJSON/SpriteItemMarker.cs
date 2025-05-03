@@ -55,13 +55,13 @@ namespace ATLASPlotterJSON
             // Store references to the data
             spriteItem = item;
             markerColor = color;
+            MarkerColor = color;
             
             // Create a rectangle to visualize the sprite source area (where it is in the atlas)
             // This rectangle shows exactly which pixels in the atlas image belong to this sprite
             sourceBox = new Rectangle
             {
-                Width = item.Source.Width,                                        // Width from the sprite data
-                Height = item.Source.Height,                                      // Height from the sprite data
+                // We'll set width and height in UpdatePosition to match image scaling
                 Stroke = new SolidColorBrush(color),                              // Outline using the sprite's color
                 StrokeThickness = 2,                                              // Border thickness
                 Fill = new SolidColorBrush(Color.FromArgb(40, color.R, color.G, color.B))  // Semi-transparent fill
@@ -146,7 +146,7 @@ namespace ATLASPlotterJSON
         }
         
         /// <summary>
-        /// Updates the position and size of the marker to match the sprite data
+        /// Updates the position and size of the marker to match the sprite data and current image scaling
         /// </summary>
         public void UpdatePosition()
         {
@@ -161,35 +161,61 @@ namespace ATLASPlotterJSON
             if (mainWindow?.LoadedImage != null)
             {
                 var image = mainWindow.DisplayImage;
+                
+                // Calculate how much the image has been scaled to fit in the window
                 scaleX = image.Width / mainWindow.LoadedImage.Width;
                 scaleY = image.Height / mainWindow.LoadedImage.Height;
+                
+                // Get the offset of the image within the canvas
                 offsetX = Canvas.GetLeft(image);
                 offsetY = Canvas.GetTop(image);
             }
             
             // Calculate the display position on the scaled canvas
+            // This maps our sprite's actual pixel coordinates to the scaled and offset position on screen
             double displayX = spriteItem.Source.X * scaleX + offsetX;
             double displayY = spriteItem.Source.Y * scaleY + offsetY;
+            
+            // Scale the width and height to match the image scaling
             double displayWidth = spriteItem.Source.Width * scaleX;
             double displayHeight = spriteItem.Source.Height * scaleY;
             
             // Position and size the source box to match the sprite data
+            // This ensures the visual marker matches the image scaling
             Canvas.SetLeft(sourceBox, displayX);
             Canvas.SetTop(sourceBox, displayY);
             sourceBox.Width = displayWidth;
             sourceBox.Height = displayHeight;
-            sourceBox.StrokeThickness = 2;
+            
+            // Adjust stroke thickness based on image scale to maintain visual consistency
+            sourceBox.StrokeThickness = Math.Max(1, 2 * Math.Min(scaleX, scaleY));
             
             // Update the label text to ensure it's current
             UpdateNameDisplay();
             
-            // Position the label at the top-left corner of the box
+            // Position the label above the box with proper scaling
             Canvas.SetLeft(label, displayX);
-            Canvas.SetTop(label, displayY - label.ActualHeight - 2);
             
-            // Keep text at a readable size
-            label.FontSize = 12;
-            label.Padding = new Thickness(4);
+            // If the image is very small, adjust label position to ensure it's visible
+            if (displayHeight < 20)
+            {
+                // Position the label beside the marker if it's too small
+                Canvas.SetTop(label, displayY);
+                Canvas.SetLeft(label, displayX + displayWidth + 5);
+            }
+            else
+            {
+                // Position the label above the marker
+                Canvas.SetTop(label, displayY - label.ActualHeight - 2);
+            }
+            
+            // Adjust font size based on image scaling but keep it readable
+            double scaledFontSize = 12 * Math.Min(scaleX, scaleY);
+            label.FontSize = Math.Max(8, Math.Min(scaledFontSize, 14)); // Keep between 8 and 14
+            
+            // Adjust padding based on scale but maintain minimum spacing
+            double scaledPadding = 4 * Math.Min(scaleX, scaleY);
+            label.Padding = new Thickness(Math.Max(1, scaledPadding));
         }
         
         /// <summary>
@@ -202,18 +228,39 @@ namespace ATLASPlotterJSON
         /// </remarks>
         public void UpdateAppearance(bool isSelected)
         {
+            // Get the current scale to adjust visual elements
+            double scaleX = 1.0;
+            double scaleY = 1.0;
+            
+            // Find MainWindow instance to get scaling factors
+            MainWindow? mainWindow = Window.GetWindow(this) as MainWindow;
+            if (mainWindow?.LoadedImage != null)
+            {
+                var image = mainWindow.DisplayImage;
+                scaleX = image.Width / mainWindow.LoadedImage.Width;
+                scaleY = image.Height / mainWindow.LoadedImage.Height;
+            }
+            
+            // Minimum scale factor to ensure visibility
+            double minScale = Math.Min(scaleX, scaleY);
+            
             // Change appearance based on selection state
             if (isSelected)
             {
                 // Selected sprite has thicker, dashed border and bolder text
-                sourceBox.StrokeThickness = 3;
-                sourceBox.StrokeDashArray = [4, 2];  // Dashed line pattern
+                sourceBox.StrokeThickness = Math.Max(2, 3 * minScale);
+                
+                // Scale the dash pattern based on the image scaling
+                double dashSize = Math.Max(2, 4 * minScale);
+                double gapSize = Math.Max(1, 2 * minScale);
+                sourceBox.StrokeDashArray = new DoubleCollection { dashSize, gapSize };  
+                
                 label.FontWeight = FontWeights.ExtraBold;                   // Extra bold text
             }
             else
             {
                 // Non-selected sprite has regular border and normal bold text
-                sourceBox.StrokeThickness = 2;
+                sourceBox.StrokeThickness = Math.Max(1, 2 * minScale);
                 sourceBox.StrokeDashArray = null;                           // Solid line
                 label.FontWeight = FontWeights.Bold;                        // Regular bold text
             }

@@ -761,11 +761,18 @@ namespace ATLASPlotterJSON
                 pixelLocationDisplay.UpdatePosition(pixelLocationDisplay.CurrentLocation);
             }
 
-            // Update all sprite markers
+            // Update all sprite markers to match new scaling
             foreach (var marker in spriteMarkers.Values)
             {
+                // Update the marker's position with the new scaling
                 marker.UpdatePosition();
+                
+                // Also update appearance to ensure selected state is correctly displayed
+                marker.UpdateAppearance(marker.SpriteItem == jsonDataEntry.SpriteCollection.SelectedItem);
             }
+            
+            // Update any selection handles
+            UpdateHandlePositions();
         }
 
         /// <summary>
