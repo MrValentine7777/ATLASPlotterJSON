@@ -334,19 +334,13 @@ namespace ATLASPlotterJSON
             {
                 var marker = markerPair.Value;
                 
-                // Create a container for the marker and label
-                Canvas markerContainer = new Canvas
-                {
-                    Tag = "ZoomMarkerContainer"
-                };
-                
                 // Get sprite position and dimensions
                 double x = marker.SpriteItem.Source.X;
                 double y = marker.SpriteItem.Source.Y;
                 double width = marker.SpriteItem.Source.Width;
                 double height = marker.SpriteItem.Source.Height;
                 
-                // Create a new rectangle for the marker
+                // Create a new rectangle for the marker - using same style as the main canvas
                 var rect = new Rectangle
                 {
                     Width = width,
@@ -360,50 +354,48 @@ namespace ATLASPlotterJSON
                     Tag = "ZoomMarkerRect"
                 };
                 
-                // Create a label for the marker similar to SpriteItemMarker
+                // Create a label for the marker - but with no background frame
                 var label = new TextBlock
                 {
                     Text = $"#{marker.SpriteItem.Id}: {marker.SpriteItem.Name}",
-                    Background = new SolidColorBrush(Color.FromArgb(180, 0, 0, 0)),
+                    // No background to remove the label box frame
                     Foreground = new SolidColorBrush(marker.MarkerColor),
-                    Padding = new Thickness(2),
                     FontWeight = FontWeights.Bold,
-                    FontSize = Math.Min(12 * (1.0 / currentZoom) * 3, 12), // Scale font based on zoom
+                    FontSize = Math.Max(8.0 / currentZoom, 0.5), // Scale font with zoom
                     Tag = "ZoomMarkerLabel"
                 };
                 
-                // Add elements to the container
-                markerContainer.Children.Add(rect);
-                markerContainer.Children.Add(label);
-                
-                // Create a transform group for the container
-                TransformGroup transformGroup = new TransformGroup();
+                // Create a transform group for the rectangle
+                TransformGroup rectTransformGroup = new TransformGroup();
                 
                 // Add scale transform
-                ScaleTransform scaleTransform = new ScaleTransform(currentZoom, currentZoom);
-                transformGroup.Children.Add(scaleTransform);
+                ScaleTransform rectScaleTransform = new ScaleTransform(currentZoom, currentZoom);
+                rectTransformGroup.Children.Add(rectScaleTransform);
                 
                 // Add translation transform for position
-                TranslateTransform translateTransform = new TranslateTransform(
+                TranslateTransform rectTranslateTransform = new TranslateTransform(
                     (x - panOffset.X) * currentZoom, 
                     (y - panOffset.Y) * currentZoom);
-                transformGroup.Children.Add(translateTransform);
+                rectTransformGroup.Children.Add(rectTranslateTransform);
                 
-                // Apply the transform to the container
-                markerContainer.RenderTransform = transformGroup;
+                // Apply the transform to the rectangle
+                rect.RenderTransform = rectTransformGroup;
                 
-                // Position the label above the rectangle
-                Canvas.SetLeft(rect, 0);
-                Canvas.SetTop(rect, 0);
-                Canvas.SetLeft(label, 0);
-                Canvas.SetTop(label, -20 / currentZoom); // Position above the rectangle
+                // Create transform for the label
+                TransformGroup labelTransformGroup = new TransformGroup();
                 
-                // Ensure text is readable at any zoom level
-                if (currentZoom > 8)
-                {
-                    // At high zoom, make text smaller
-                    label.FontSize = Math.Max(8, 12 / (currentZoom / 8));
-                }
+                // Add scale transform for label
+                ScaleTransform labelScaleTransform = new ScaleTransform(currentZoom, currentZoom);
+                labelTransformGroup.Children.Add(labelScaleTransform);
+                
+                // Add translation transform for label position
+                TranslateTransform labelTranslateTransform = new TranslateTransform(
+                    (x - panOffset.X) * currentZoom, 
+                    (y - panOffset.Y - 12.0 / currentZoom) * currentZoom); // Position above rectangle
+                labelTransformGroup.Children.Add(labelTranslateTransform);
+                
+                // Apply the transform to the label
+                label.RenderTransform = labelTransformGroup;
                 
                 // Show whether this sprite is selected
                 bool isSelected = marker.SpriteItem == parentWindow.jsonDataEntry.SpriteCollection.SelectedItem;
@@ -414,17 +406,20 @@ namespace ATLASPlotterJSON
                     label.FontWeight = FontWeights.ExtraBold;
                 }
                 
+                // Add rectangle first (will be behind the label)
                 // Ensure the marker is above the image but below the viewport indicator
                 if (contentCanvas.Children.Contains(viewportIndicator))
                 {
                     // Insert just before the viewport indicator to ensure proper z-order
                     int viewportIndex = contentCanvas.Children.IndexOf(viewportIndicator);
-                    contentCanvas.Children.Insert(viewportIndex, markerContainer);
+                    contentCanvas.Children.Insert(viewportIndex, rect);
+                    contentCanvas.Children.Insert(viewportIndex, label);
                 }
                 else
                 {
                     // Fallback if viewport indicator is not found
-                    contentCanvas.Children.Add(markerContainer);
+                    contentCanvas.Children.Add(rect);
+                    contentCanvas.Children.Add(label);
                 }
             }
         }
