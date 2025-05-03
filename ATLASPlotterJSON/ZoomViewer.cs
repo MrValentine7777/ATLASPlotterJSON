@@ -20,6 +20,7 @@ namespace ATLASPlotterJSON
         private const double MAX_ZOOM = 50.0;
         private const double ZOOM_STEP = 0.25;
         private const double BORDER_THICKNESS = 1.0;
+        private const double DEFAULT_ZOOM = 1.0; // Changed default zoom to 1.0 for pixel-perfect match
 
         // Reference to the main window
         private readonly MainWindow parentWindow;
@@ -33,7 +34,7 @@ namespace ATLASPlotterJSON
         private readonly TextBlock zoomLevelText;
 
         // Current zoom state
-        private double currentZoom = 2.0;
+        private double currentZoom = DEFAULT_ZOOM; // Initialize to 1.0 for pixel-perfect match
         private Point panOffset = new Point(0, 0);
         private bool isDragging = false;
         private Point lastMousePos;
@@ -79,7 +80,7 @@ namespace ATLASPlotterJSON
                 RenderTransformOrigin = new Point(0, 0)
             };
 
-            // Set attached properties correctly
+            // Set attached properties correctly for pixel-perfect rendering
             RenderOptions.SetBitmapScalingMode(zoomedImage, BitmapScalingMode.NearestNeighbor);
             RenderOptions.SetEdgeMode(zoomedImage, EdgeMode.Aliased);
 
@@ -122,16 +123,25 @@ namespace ATLASPlotterJSON
             };
             Button zoomInBtn = new Button { Content = "+", Width = 24, Padding = new Thickness(0) };
             Button resetBtn = new Button { Content = "R", Width = 24, Padding = new Thickness(0) };
+            // Add a new button specifically for 1:1 pixel match
+            Button oneToOneBtn = new Button { 
+                Content = "1:1", 
+                Width = 30, 
+                Padding = new Thickness(0),
+                ToolTip = "Set to exact 1:1 pixel match"
+            };
 
             // Add handlers for zoom buttons
             zoomOutBtn.Click += (s, e) => AdjustZoom(-ZOOM_STEP);
             zoomInBtn.Click += (s, e) => AdjustZoom(ZOOM_STEP);
             resetBtn.Click += (s, e) => ResetZoom();
+            oneToOneBtn.Click += (s, e) => SetOneToOneZoom();
 
             // Add controls to the zoom panel
             zoomControls.Children.Add(zoomOutBtn);
             zoomControls.Children.Add(zoomLevelText);
             zoomControls.Children.Add(zoomInBtn);
+            zoomControls.Children.Add(oneToOneBtn); // Add the new 1:1 button
             zoomControls.Children.Add(resetBtn);
 
             // Add components to the canvas
@@ -172,6 +182,34 @@ namespace ATLASPlotterJSON
             
             // Subscribe to size change event to update canvas layout
             this.SizeChanged += ZoomViewer_SizeChanged;
+        }
+
+        /// <summary>
+        /// Sets the zoom level to exactly 1:1 for pixel-perfect matching
+        /// </summary>
+        private void SetOneToOneZoom()
+        {
+            // Set zoom to exactly 1.0 for pixel-perfect display
+            currentZoom = 1.0;
+            zoomLevelText.Text = "1.0×";
+            
+            // Center view if needed
+            if (parentWindow.LoadedImage != null)
+            {
+                // Center the current view on the image
+                Point centerPoint = new Point(
+                    parentWindow.LoadedImage.PixelWidth / 2,
+                    parentWindow.LoadedImage.PixelHeight / 2
+                );
+                
+                // Calculate new pan offset to center on this point
+                panOffset = new Point(
+                    centerPoint.X - (contentCanvas.ActualWidth / 2) / currentZoom,
+                    centerPoint.Y - (contentCanvas.ActualHeight / 2) / currentZoom
+                );
+                
+                UpdateZoomedContent();
+            }
         }
 
         /// <summary>
@@ -252,6 +290,7 @@ namespace ATLASPlotterJSON
                 zoomedImage.RenderTransform = transformGroup;
                 
                 // Make sure image is sized correctly at its natural size
+                // This is important for exact pixel matching
                 zoomedImage.Width = double.NaN; // Auto
                 zoomedImage.Height = double.NaN; // Auto
                 
@@ -276,7 +315,7 @@ namespace ATLASPlotterJSON
             if (parentWindow.LoadedImage == null || parentWindow.DisplayImage == null)
                 return;
 
-            // Calculate main view scale
+            // Calculate main view scale using PixelWidth/PixelHeight for consistent scaling
             double mainScaleX = parentWindow.DisplayImage.Width / parentWindow.LoadedImage.PixelWidth;
             double mainScaleY = parentWindow.DisplayImage.Height / parentWindow.LoadedImage.PixelHeight;
 
@@ -340,13 +379,15 @@ namespace ATLASPlotterJSON
                 double width = marker.SpriteItem.Source.Width;
                 double height = marker.SpriteItem.Source.Height;
                 
-                // Create a new rectangle for the marker - using same style as the main canvas
+                // Create a new rectangle for the marker with proper scaling
+                // Use exactly the same dimensions as the sprite data - don't scale dimensions here
                 var rect = new Rectangle
                 {
                     Width = width,
                     Height = height,
                     Stroke = new SolidColorBrush(marker.MarkerColor),
-                    StrokeThickness = Math.Max(1.0 / currentZoom, 0.5),  // Scale stroke thickness with zoom
+                    // Adjust stroke thickness proportionally to zoom level to maintain visual consistency
+                    StrokeThickness = Math.Max(1.0 / currentZoom, 0.5),
                     Fill = new SolidColorBrush(Color.FromArgb(40, 
                         marker.MarkerColor.R, 
                         marker.MarkerColor.G, 
@@ -361,18 +402,20 @@ namespace ATLASPlotterJSON
                     // No background to remove the label box frame
                     Foreground = new SolidColorBrush(marker.MarkerColor),
                     FontWeight = FontWeights.Bold,
-                    FontSize = Math.Max(8.0 / currentZoom, 0.5), // Scale font with zoom
+                    // Scale font inversely with zoom to maintain proper text size
+                    FontSize = Math.Max(8.0 / currentZoom, 0.5),
                     Tag = "ZoomMarkerLabel"
                 };
                 
-                // Create a transform group for the rectangle
+                // Create a transform group for the rectangle - this is the key to proper positioning
                 TransformGroup rectTransformGroup = new TransformGroup();
                 
-                // Add scale transform
+                // Add scale transform - scale by the zoom level
                 ScaleTransform rectScaleTransform = new ScaleTransform(currentZoom, currentZoom);
                 rectTransformGroup.Children.Add(rectScaleTransform);
                 
-                // Add translation transform for position
+                // Add translation transform for position - adjust by pan offset and apply zoom
+                // This ensures the marker is placed at the correct pixel position relative to the image
                 TranslateTransform rectTranslateTransform = new TranslateTransform(
                     (x - panOffset.X) * currentZoom, 
                     (y - panOffset.Y) * currentZoom);
@@ -381,7 +424,7 @@ namespace ATLASPlotterJSON
                 // Apply the transform to the rectangle
                 rect.RenderTransform = rectTransformGroup;
                 
-                // Create transform for the label
+                // Create transform for the label using the same approach
                 TransformGroup labelTransformGroup = new TransformGroup();
                 
                 // Add scale transform for label
@@ -389,9 +432,10 @@ namespace ATLASPlotterJSON
                 labelTransformGroup.Children.Add(labelScaleTransform);
                 
                 // Add translation transform for label position
+                // Position label above the sprite with an offset that scales with zoom
                 TranslateTransform labelTranslateTransform = new TranslateTransform(
                     (x - panOffset.X) * currentZoom, 
-                    (y - panOffset.Y - 12.0 / currentZoom) * currentZoom); // Position above rectangle
+                    (y - panOffset.Y - 12.0 / currentZoom) * currentZoom);
                 labelTransformGroup.Children.Add(labelTranslateTransform);
                 
                 // Apply the transform to the label
@@ -401,8 +445,12 @@ namespace ATLASPlotterJSON
                 bool isSelected = marker.SpriteItem == parentWindow.jsonDataEntry.SpriteCollection.SelectedItem;
                 if (isSelected)
                 {
+                    // Make selected sprite stand out with thicker, dashed border
                     rect.StrokeThickness = Math.Max(2.0 / currentZoom, 1);
-                    rect.StrokeDashArray = new DoubleCollection() { 4.0 / currentZoom, 2.0 / currentZoom };
+                    rect.StrokeDashArray = new DoubleCollection() { 
+                        4.0 / currentZoom, 
+                        2.0 / currentZoom 
+                    };
                     label.FontWeight = FontWeights.ExtraBold;
                 }
                 
@@ -470,7 +518,8 @@ namespace ATLASPlotterJSON
         /// </summary>
         private void ResetZoomAndPan()
         {
-            currentZoom = 2.0;
+            // Use 1.0 for exact pixel matching as default
+            currentZoom = DEFAULT_ZOOM;
             panOffset = new Point(0, 0);
             UpdateZoomedContent();
         }

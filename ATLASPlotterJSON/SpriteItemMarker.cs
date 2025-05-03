@@ -241,8 +241,9 @@ namespace ATLASPlotterJSON
             if (mainWindow?.LoadedImage != null)
             {
                 var image = mainWindow.DisplayImage;
-                scaleX = image.Width / mainWindow.LoadedImage.Width;
-                scaleY = image.Height / mainWindow.LoadedImage.Height;
+                // FIX: Use PixelWidth/PixelHeight instead of Width/Height for consistent scaling
+                scaleX = image.Width / mainWindow.LoadedImage.PixelWidth;
+                scaleY = image.Height / mainWindow.LoadedImage.PixelHeight;
             }
             
             // Minimum scale factor to ensure visibility
