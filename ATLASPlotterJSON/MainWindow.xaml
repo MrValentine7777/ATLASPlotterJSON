@@ -30,15 +30,29 @@
         </StackPanel>
 
         <!-- Image Display Area -->
-        <Border Grid.Row="1" Grid.Column="0" BorderBrush="Gray" BorderThickness="1" Margin="10" Background="#FFE5E5E5">
-            <Canvas x:Name="imageCanvas" Background="Transparent" 
+        <Grid Grid.Row="1" Grid.Column="0" Margin="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto" x:Name="zoomViewerRow"/>
+            </Grid.RowDefinitions>
+            
+            <!-- Main Image Canvas -->
+            <Border Grid.Row="0" BorderBrush="Gray" BorderThickness="1" Background="#FFE5E5E5">
+                <Canvas x:Name="imageCanvas" Background="Transparent" 
                     MouseLeftButtonDown="imageCanvas_MouseLeftButtonDown" 
                     MouseMove="imageCanvas_MouseMove"
                     MouseLeftButtonUp="imageCanvas_MouseLeftButtonUp">
-                <Image x:Name="displayImage" RenderOptions.BitmapScalingMode="NearestNeighbor" 
+                    <Image x:Name="displayImage" RenderOptions.BitmapScalingMode="NearestNeighbor" 
                        RenderOptions.EdgeMode="Aliased" Stretch="Uniform"/>
-            </Canvas>
-        </Border>
+                </Canvas>
+            </Border>
+            
+            <!-- Zoom Viewer will be placed here programmatically -->
+            <Border x:Name="zoomViewerContainer" Grid.Row="1" 
+                    BorderBrush="Gray" BorderThickness="1" 
+                    Background="#FFE5E5E5" Visibility="Collapsed"
+                    Margin="0,5,0,0" Height="150"/>
+        </Grid>
 
         <!-- JSON Data Entry Panel -->
         <local:JsonDataEntryControl x:Name="jsonDataEntry" 

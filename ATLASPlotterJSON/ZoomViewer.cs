@@ -9,18 +9,17 @@ using System.Windows.Shapes;
 namespace ATLASPlotterJSON
 {
     /// <summary>
-    /// A floating zoom viewer control that allows zooming into the atlas image
+    /// A docked zoom viewer control that allows zooming into the atlas image
     /// while keeping the main view unchanged.
     /// </summary>
-    public class ZoomViewer : Canvas
+    public class ZoomViewer : UserControl
     {
         // Constants for the zoom viewer appearance and behavior
-        private const double DEFAULT_WIDTH = 200.0;
-        private const double DEFAULT_HEIGHT = 200.0;
+        private const double DEFAULT_HEIGHT = 150.0;
         private const double MIN_ZOOM = 1.0;
         private const double MAX_ZOOM = 10.0;
         private const double ZOOM_STEP = 0.25;
-        private const double BORDER_THICKNESS = 2.0;
+        private const double BORDER_THICKNESS = 1.0;
 
         // Reference to the main window
         private readonly MainWindow parentWindow;
@@ -38,19 +37,10 @@ namespace ATLASPlotterJSON
         private bool isDragging = false;
         private Point lastMousePos;
 
-        // Data this marker represents
-        private readonly SpriteItem spriteItem; // The sprite data model this marker represents
-        private readonly Color markerColor;     // Color used for visual identification
-
         /// <summary>
         /// Gets the current zoom level of the zoom viewer
         /// </summary>
         public double CurrentZoom => currentZoom;
-
-        /// <summary>
-        /// Gets the color used for this marker
-        /// </summary>
-        public Color MarkerColor => markerColor;
 
         /// <summary>
         /// Creates a new zoom viewer attached to the parent window
@@ -59,28 +49,22 @@ namespace ATLASPlotterJSON
         public ZoomViewer(MainWindow parent)
         {
             parentWindow = parent;
-
-            // Set a high Z-index to ensure the zoom viewer appears above all other elements
-            Panel.SetZIndex(this, 1000);
-
-
+            
+            // Create the main grid container
+            Grid mainGrid = new Grid();
+            
             // Set up the main container with a border
             border = new Border
             {
-                Width = DEFAULT_WIDTH,
-                Height = DEFAULT_HEIGHT,
                 Background = new SolidColorBrush(Color.FromArgb(225, 240, 240, 240)),
                 BorderBrush = Brushes.DarkGray,
-                BorderThickness = new Thickness(BORDER_THICKNESS),
-                CornerRadius = new CornerRadius(3)
+                BorderThickness = new Thickness(BORDER_THICKNESS)
             };
 
             // Set up the canvas for the zoomed content
             contentCanvas = new Canvas
             {
-                ClipToBounds = true,
-                Width = DEFAULT_WIDTH - (BORDER_THICKNESS * 2),
-                Height = DEFAULT_HEIGHT - (BORDER_THICKNESS * 2) - 24 // Leave room for controls
+                ClipToBounds = true
             };
 
             // Set up the zoomed image
@@ -106,8 +90,19 @@ namespace ATLASPlotterJSON
             zoomControls = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
-                Height = 20,
-                HorizontalAlignment = HorizontalAlignment.Center
+                Height = 24,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(0, 3, 5, 0)
+            };
+
+            // Create label
+            TextBlock labelText = new TextBlock
+            {
+                Text = "Zoom Viewer",
+                FontWeight = FontWeights.Bold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(5, 3, 10, 0)
             };
 
             // Create zoom buttons
@@ -137,34 +132,33 @@ namespace ATLASPlotterJSON
             contentCanvas.Children.Add(zoomedImage);
             contentCanvas.Children.Add(viewportIndicator);
 
-            // Add elements to the border
+            // Create a grid for layout
             Grid containerGrid = new Grid();
-            containerGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             containerGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            containerGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             
-            Grid.SetRow(contentCanvas, 0);
-            Grid.SetRow(zoomControls, 1);
+            // Add top panel with controls
+            DockPanel topPanel = new DockPanel { LastChildFill = true };
+            topPanel.Children.Add(zoomControls);
+            DockPanel.SetDock(zoomControls, Dock.Right);
+            topPanel.Children.Add(labelText);
             
+            Grid.SetRow(topPanel, 0);
+            Grid.SetRow(contentCanvas, 1);
+            
+            containerGrid.Children.Add(topPanel);
             containerGrid.Children.Add(contentCanvas);
-            containerGrid.Children.Add(zoomControls);
             
             border.Child = containerGrid;
 
-            // Add the border to this canvas
-            this.Children.Add(border);
-
+            // Set the content of this control
+            this.Content = border;
+            
             // Set up event handlers for zooming and panning
             contentCanvas.MouseWheel += ContentCanvas_MouseWheel;
             contentCanvas.MouseLeftButtonDown += ContentCanvas_MouseLeftButtonDown;
             contentCanvas.MouseMove += ContentCanvas_MouseMove;
             contentCanvas.MouseLeftButtonUp += ContentCanvas_MouseLeftButtonUp;
-
-            // Make the zoom viewer draggable
-            border.MouseLeftButtonDown += Border_MouseLeftButtonDown;
-            
-            // Position the zoom viewer in the lower left corner
-            Canvas.SetLeft(this, 10);
-            Canvas.SetBottom(this, 40); // Leave some space for the status bar
 
             // Initially hide until an image is loaded
             this.Visibility = Visibility.Collapsed;
@@ -407,64 +401,6 @@ namespace ATLASPlotterJSON
                 isDragging = false;
                 contentCanvas.ReleaseMouseCapture();
                 e.Handled = true;
-            }
-        }
-
-        /// <summary>
-        /// Allows the zoom viewer itself to be dragged around
-        /// </summary>
-        private void Border_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            // Capture the mouse to drag the entire zoom viewer
-            if (e.OriginalSource == border)
-            {
-                lastMousePos = e.GetPosition(parentWindow);
-                border.CaptureMouse();
-                border.MouseMove += Border_MouseMove;
-                border.MouseLeftButtonUp += Border_MouseLeftButtonUp;
-                e.Handled = true;
-            }
-        }
-
-        /// <summary>
-        /// Moves the zoom viewer with the mouse
-        /// </summary>
-        private void Border_MouseMove(object sender, MouseEventArgs e)
-        {
-            if (border.IsMouseCaptured)
-            {
-                // Calculate new position
-                Point currentPos = e.GetPosition(parentWindow);
-                Vector delta = currentPos - lastMousePos;
-                
-                double newLeft = Canvas.GetLeft(this) + delta.X;
-                double newTop = Canvas.GetTop(this) + delta.Y;
-                
-                // Ensure the zoom viewer stays within the window bounds
-                newLeft = Math.Max(0, Math.Min(newLeft, parentWindow.ActualWidth - border.ActualWidth));
-                newTop = Math.Max(0, Math.Min(newTop, parentWindow.ActualHeight - border.ActualHeight));
-                
-                // Update position
-                Canvas.SetLeft(this, newLeft);
-                Canvas.SetTop(this, newTop);
-                Canvas.SetBottom(this, double.NaN); // Clear bottom property
-                
-                // Update last position
-                lastMousePos = currentPos;
-            }
-        }
-
-        /// <summary>
-        /// Ends the dragging of the zoom viewer
-        /// </summary>
-        private void Border_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            // Release mouse capture
-            if (border.IsMouseCaptured)
-            {
-                border.ReleaseMouseCapture();
-                border.MouseMove -= Border_MouseMove;
-                border.MouseLeftButtonUp -= Border_MouseLeftButtonUp;
             }
         }
     }
