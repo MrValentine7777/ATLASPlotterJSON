@@ -100,6 +100,7 @@ namespace ATLASPlotterJSON
             jsonDataEntry.SelectedSpriteChanged += OnSelectedSpriteChanged!;
             jsonDataEntry.SpriteAdded += OnSpriteAdded!;
             jsonDataEntry.SpriteRemoved += OnSpriteRemoved!;
+            jsonDataEntry.SpritePropertyChanged += OnSpritePropertyChanged!;
 
             // Subscribe to the window size changed event
             SizeChanged += Window_SizeChanged;
@@ -136,6 +137,7 @@ namespace ATLASPlotterJSON
                     // 3. Enable the UI buttons for saving and clearing
                     btnSaveAtlas.IsEnabled = true;
                     btnClearSelections.IsEnabled = true;
+                    btnUpdateMarkers.IsEnabled = true;  // Enable the Update Markers button
 
                     // 4. Create the pixel location tracker for precise positioning
                     InitializePixelLocationDisplay();
@@ -322,6 +324,18 @@ namespace ATLASPlotterJSON
         }
 
         /// <summary>
+        /// Event handler for when a sprite property changes in the JsonDataEntryControl
+        /// Updates the visual marker on the canvas to reflect the changes
+        /// </summary>
+        /// <param name="sender">The JsonDataEntryControl</param>
+        /// <param name="sprite">The sprite with changed properties</param>
+        private void OnSpritePropertyChanged(object sender, SpriteItem sprite)
+        {
+            // Update the sprite's visual representation
+            UpdateSelectedSpriteMarker();
+        }
+
+        /// <summary>
         /// Converts a mouse position to precise pixel coordinates
         /// Accounts for image scaling and ensures coordinates are whole numbers
         /// </summary>
@@ -430,7 +444,7 @@ namespace ATLASPlotterJSON
         /// Updates the position of the selected sprite's marker
         /// Called when the sprite's position changes through mouse interaction
         /// </summary>
-        private void UpdateSelectedSpriteMarker()
+        public void UpdateSelectedSpriteMarker()
         {
             // COMPONENT CONNECTION:
             // Get the currently selected sprite from JsonDataEntryControl
@@ -441,6 +455,33 @@ namespace ATLASPlotterJSON
             {
                 // Update the marker's position
                 marker.UpdatePosition();
+            }
+
+            // Also update all selection handles
+            UpdateHandlePositions();
+        }
+
+        /// <summary>
+        /// Updates the positions of all selection handles based on their target rectangles.
+        /// Called whenever a rectangle's position or dimensions change.
+        /// </summary>
+        public void UpdateHandlePositions()
+        {
+            // Calculate the current zoom level based on image scaling
+            double zoomLevel = 1.0;
+            if (loadedImage != null && displayImage != null)
+            {
+                zoomLevel = displayImage.Width / loadedImage.Width;
+            }
+
+            // Find all SelectionHandle elements in the canvas and update their positions
+            foreach (var element in imageCanvas.Children)
+            {
+                if (element is SelectionHandle handle)
+                {
+                    // Update the handle position with the current zoom level
+                    handle.UpdatePosition(zoomLevel);
+                }
             }
         }
 
@@ -468,15 +509,6 @@ namespace ATLASPlotterJSON
                 // Update the visual marker for the selected sprite
                 UpdateSelectedSpriteMarker();
             }
-        }
-
-        /// <summary>
-        /// Legacy method kept for compatibility with older code
-        /// No longer used in current version
-        /// </summary>
-        public void UpdateHandlePositions()
-        {
-            // Method kept for compatibility
         }
 
         /// <summary>
@@ -575,6 +607,41 @@ namespace ATLASPlotterJSON
             if (pixelLocationDisplay != null)
             {
                 pixelLocationDisplay.Hide();
+            }
+        }
+
+        /// <summary>
+        /// Event handler for the "Update Markers" button click
+        /// Recreates all sprite markers on the canvas to ensure their visual representation matches the data
+        /// </summary>
+        private void btnUpdateMarkers_Click(object sender, RoutedEventArgs e)
+        {
+            // Only proceed if an image is loaded
+            if (loadedImage == null)
+            {
+                MessageBox.Show("Please load an image before updating markers.",
+                    "Atlas Plotter", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            try
+            {
+                // Update status message
+                UpdateSelectionStatus(0, 0, 0, 0, true);
+                tbSelectionInfo.Text = "Updating sprite markers...";
+
+                // Recreate all markers for existing sprites
+                CreateMarkersForExistingSprites();
+
+                // Show a success message
+                tbSelectionInfo.Text = $"Successfully updated {spriteMarkers.Count} sprite markers.";
+            }
+            catch (Exception ex)
+            {
+                // Show an error message if something goes wrong
+                MessageBox.Show($"Error updating markers: {ex.Message}", "Error", 
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                tbSelectionInfo.Text = "Error updating markers.";
             }
         }
 

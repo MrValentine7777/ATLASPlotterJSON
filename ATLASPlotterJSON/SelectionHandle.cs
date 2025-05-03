@@ -88,6 +88,14 @@ namespace ATLASPlotterJSON
             this.MouseLeftButtonUp += Handle_MouseLeftButtonUp;      // End dragging
             this.MouseMove += Handle_MouseMove;                      // Update while dragging
 
+            // Add property change notifications for the target rectangle
+            // This ensures handles automatically update when rectangle properties change
+            targetRect.SizeChanged += (sender, e) =>
+            {
+                UpdatePosition();
+                parent.UpdateHandlePositions();
+            };
+
             // Initial positioning of the handle based on the target rectangle
             UpdatePosition();
         }
@@ -148,7 +156,7 @@ namespace ATLASPlotterJSON
         /// </summary>
         /// <param name="position">The corner position of the handle</param>
         /// <returns>The appropriate cursor for the specified position</returns>
-        private static Cursor GetCursorForPosition(HandlePosition position)
+        private static  Cursor GetCursorForPosition(HandlePosition position)
         {
             // Return diagonal resize cursors based on the handle position
             // This provides a visual cue about the direction the selection will resize

@@ -86,6 +86,19 @@ namespace ATLASPlotterJSON
         public event EventHandler<SpriteItem>? SpriteRemoved;
 
         /// <summary>
+        /// COMMUNICATION SYSTEM - EVENTS:
+        /// 
+        /// Event that notifies the MainWindow when a sprite property changes.
+        /// This allows the MainWindow to update the visual marker on the canvas.
+        /// 
+        /// EVENT FLOW:
+        /// 1. User edits a sprite property in this control's forms
+        /// 2. This event fires to notify MainWindow
+        /// 3. MainWindow updates the corresponding SpriteItemMarker
+        /// </summary>
+        public event EventHandler<SpriteItem>? SpritePropertyChanged;
+
+        /// <summary>
         /// Public access to the sprite collection for other components.
         /// This allows MainWindow to access the collection of sprites.
         /// </summary>
@@ -112,7 +125,45 @@ namespace ATLASPlotterJSON
                 // Forward the event to anyone listening (MainWindow)
                 // This is called "event bubbling" - passing events up the chain
                 SelectedSpriteChanged?.Invoke(this, item);
+                
+                // When a sprite is selected, subscribe to its Source property changes
+                if (item != null)
+                {
+                    SubscribeToSourcePropertyChanges(item);
+                }
             };
+        }
+
+        /// <summary>
+        /// Subscribes to property changes on the sprite's Source object to ensure
+        /// display updates when X, Y, Width, or Height are edited directly in the UI
+        /// </summary>
+        /// <param name="sprite">The sprite to monitor for Source property changes</param>
+        private void SubscribeToSourcePropertyChanges(SpriteItem sprite)
+        {
+            // Remove previous handlers if any (to avoid duplicate subscriptions)
+            sprite.Source.PropertyChanged -= Source_PropertyChanged;
+            
+            // Monitor changes to the Source object's properties
+            sprite.Source.PropertyChanged += Source_PropertyChanged;
+        }
+
+        /// <summary>
+        /// Handles property changes in the Source object (X, Y, Width, Height)
+        /// Updates the visual display on the canvas when these values change through direct UI editing
+        /// </summary>
+        /// <param name="sender">The Source object that changed</param>
+        /// <param name="e">Information about which property changed</param>
+        private void Source_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            // When X, Y, Width or Height changes, we need to update the sprite marker on the canvas
+            if (e.PropertyName == "X" || e.PropertyName == "Y" || 
+                e.PropertyName == "Width" || e.PropertyName == "Height")
+            {
+                // Notify listeners (MainWindow) that a sprite's properties have changed
+                // This triggers MainWindow.UpdateSelectedSpriteMarker
+                SpritePropertyChanged?.Invoke(this, _spriteCollection.SelectedItem);
+            }
         }
 
         /// <summary>
