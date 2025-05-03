@@ -11,6 +11,9 @@ ATLAS Plotter is a tool for defining sprite regions within a sprite atlas image.
 - **Property Configuration**: Configure sprite properties (position, size, name, ID)
 - **Collider Support**: Add collision boundaries to sprites for game physics
 - **JSON Import/Export**: Save sprite data as structured JSON for use in game engines
+- **Clipboard Support**: Copy sprite data directly to clipboard for quick sharing or integration
+  - Copy the current selected sprite as formatted JSON
+  - Copy all sprites as a complete JSON collection
 - **Zoom Viewer**: Magnified view for detailed sprite editing and positioning
 - **Pixel-Perfect Positioning**: Coordinate tracking for precise sprite placement
 
