@@ -5,6 +5,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
+using System.Collections.Generic;
 
 namespace ATLASPlotterJSON
 {
@@ -41,6 +42,9 @@ namespace ATLASPlotterJSON
 
         // Track whether content is initialized
         private bool contentInitialized = false;
+
+        // Dictionary to track SpriteItemMarkers in the zoom viewer
+        private readonly Dictionary<int, SpriteItemMarker> zoomMarkers = new Dictionary<int, SpriteItemMarker>();
 
         /// <summary>
         /// Gets the current zoom level of the zoom viewer
@@ -349,127 +353,71 @@ namespace ATLASPlotterJSON
 
         /// <summary>
         /// Updates the markers within the zoom viewer to reflect the current zoom level
+        /// using actual SpriteItemMarker instances like the main canvas
         /// </summary>
         private void UpdateMarkers()
         {
-            // Remove any existing marker elements but keep the image and viewport indicator
-            for (int i = contentCanvas.Children.Count - 1; i >= 0; i--)
+            // First, remove any existing markers from the zoom viewer
+            foreach (var marker in zoomMarkers.Values)
             {
-                UIElement element = contentCanvas.Children[i];
-                if ((element is Rectangle rect && rect != viewportIndicator) ||
-                    (element is Canvas canvas && canvas.Tag as string == "ZoomMarkerContainer") ||
-                    (element is TextBlock tb && tb.Tag as string == "ZoomMarkerLabel"))
-                {
-                    contentCanvas.Children.RemoveAt(i);
-                }
+                contentCanvas.Children.Remove(marker);
             }
+            zoomMarkers.Clear();
 
             // If no image is loaded, return
             if (parentWindow.LoadedImage == null)
                 return;
 
-            // Add sprite markers to the zoomed view
-            foreach (var markerPair in parentWindow.spriteMarkers)
+            // Create new markers for each sprite using the same SpriteItemMarker class
+            foreach (var mainMarkerPair in parentWindow.spriteMarkers)
             {
-                var marker = markerPair.Value;
+                // Get the sprite item and marker color
+                var spriteItem = mainMarkerPair.Value.SpriteItem;
+                var color = mainMarkerPair.Value.MarkerColor;
                 
-                // Get sprite position and dimensions
-                double x = marker.SpriteItem.Source.X;
-                double y = marker.SpriteItem.Source.Y;
-                double width = marker.SpriteItem.Source.Width;
-                double height = marker.SpriteItem.Source.Height;
+                // Create a new SpriteItemMarker for the zoom viewer
+                var zoomMarker = new SpriteItemMarker(spriteItem, color);
                 
-                // Create a new rectangle for the marker with proper scaling
-                // Use exactly the same dimensions as the sprite data - don't scale dimensions here
-                var rect = new Rectangle
-                {
-                    Width = width,
-                    Height = height,
-                    Stroke = new SolidColorBrush(marker.MarkerColor),
-                    // Adjust stroke thickness proportionally to zoom level to maintain visual consistency
-                    StrokeThickness = Math.Max(1.0 / currentZoom, 0.5),
-                    Fill = new SolidColorBrush(Color.FromArgb(40, 
-                        marker.MarkerColor.R, 
-                        marker.MarkerColor.G, 
-                        marker.MarkerColor.B)),
-                    Tag = "ZoomMarkerRect"
+                // We need to set a custom ScaleTransform to make the marker work with our zoom level
+                TransformGroup markerTransform = new TransformGroup();
+                
+                // Apply our zoom level
+                ScaleTransform markerScale = new ScaleTransform(currentZoom, currentZoom);
+                markerTransform.Children.Add(markerScale);
+                
+                // Apply translation to account for panning
+                TranslateTransform markerTranslate = new TranslateTransform(
+                    -panOffset.X * currentZoom,
+                    -panOffset.Y * currentZoom);
+                markerTransform.Children.Add(markerTranslate);
+                
+                // Apply the transform directly to the marker
+                zoomMarker.RenderTransform = markerTransform;
+                zoomMarker.RenderTransformOrigin = new Point(0, 0);
+                
+                // Add the marker to the canvas
+                contentCanvas.Children.Add(zoomMarker);
+                
+                // Keep track of it in our local dictionary
+                zoomMarkers[spriteItem.Id] = zoomMarker;
+                
+                // Set appropriate z-index to make sure markers are above the image 
+                // but below the viewport indicator
+                Panel.SetZIndex(zoomMarker, 5);
+                
+                // Connect the zoom marker's selection event to update main window selection
+                zoomMarker.MarkerSelected += (s, e) => {
+                    // Forward the selection to the main window's data entry control
+                    parentWindow.jsonDataEntry.SpriteCollection.SelectedItem = e;
                 };
                 
-                // Create a label for the marker - but with no background frame
-                var label = new TextBlock
-                {
-                    Text = $"#{marker.SpriteItem.Id}: {marker.SpriteItem.Name}",
-                    // No background to remove the label box frame
-                    Foreground = new SolidColorBrush(marker.MarkerColor),
-                    FontWeight = FontWeights.Bold,
-                    // Scale font inversely with zoom to maintain proper text size
-                    FontSize = Math.Max(8.0 / currentZoom, 0.5),
-                    Tag = "ZoomMarkerLabel"
-                };
-                
-                // Create a transform group for the rectangle - this is the key to proper positioning
-                TransformGroup rectTransformGroup = new TransformGroup();
-                
-                // Add scale transform - scale by the zoom level
-                ScaleTransform rectScaleTransform = new ScaleTransform(currentZoom, currentZoom);
-                rectTransformGroup.Children.Add(rectScaleTransform);
-                
-                // Add translation transform for position - adjust by pan offset and apply zoom
-                // This ensures the marker is placed at the correct pixel position relative to the image
-                TranslateTransform rectTranslateTransform = new TranslateTransform(
-                    (x - panOffset.X) * currentZoom, 
-                    (y - panOffset.Y) * currentZoom);
-                rectTransformGroup.Children.Add(rectTranslateTransform);
-                
-                // Apply the transform to the rectangle
-                rect.RenderTransform = rectTransformGroup;
-                
-                // Create transform for the label using the same approach
-                TransformGroup labelTransformGroup = new TransformGroup();
-                
-                // Add scale transform for label
-                ScaleTransform labelScaleTransform = new ScaleTransform(currentZoom, currentZoom);
-                labelTransformGroup.Children.Add(labelScaleTransform);
-                
-                // Add translation transform for label position
-                // Position label above the sprite with an offset that scales with zoom
-                TranslateTransform labelTranslateTransform = new TranslateTransform(
-                    (x - panOffset.X) * currentZoom, 
-                    (y - panOffset.Y - 12.0 / currentZoom) * currentZoom);
-                labelTransformGroup.Children.Add(labelTranslateTransform);
-                
-                // Apply the transform to the label
-                label.RenderTransform = labelTransformGroup;
-                
-                // Show whether this sprite is selected
-                bool isSelected = marker.SpriteItem == parentWindow.jsonDataEntry.SpriteCollection.SelectedItem;
-                if (isSelected)
-                {
-                    // Make selected sprite stand out with thicker, dashed border
-                    rect.StrokeThickness = Math.Max(2.0 / currentZoom, 1);
-                    rect.StrokeDashArray = new DoubleCollection() { 
-                        4.0 / currentZoom, 
-                        2.0 / currentZoom 
-                    };
-                    label.FontWeight = FontWeights.ExtraBold;
-                }
-                
-                // Add rectangle first (will be behind the label)
-                // Ensure the marker is above the image but below the viewport indicator
-                if (contentCanvas.Children.Contains(viewportIndicator))
-                {
-                    // Insert just before the viewport indicator to ensure proper z-order
-                    int viewportIndex = contentCanvas.Children.IndexOf(viewportIndicator);
-                    contentCanvas.Children.Insert(viewportIndex, rect);
-                    contentCanvas.Children.Insert(viewportIndex, label);
-                }
-                else
-                {
-                    // Fallback if viewport indicator is not found
-                    contentCanvas.Children.Add(rect);
-                    contentCanvas.Children.Add(label);
-                }
+                // Update appearance based on selection state
+                bool isSelected = spriteItem == parentWindow.jsonDataEntry.SpriteCollection.SelectedItem;
+                zoomMarker.UpdateAppearance(isSelected);
             }
+
+            // Make sure viewport indicator is at the front
+            Panel.SetZIndex(viewportIndicator, 10);
         }
 
         /// <summary>
