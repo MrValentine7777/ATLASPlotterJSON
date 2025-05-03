@@ -451,5 +451,87 @@ namespace ATLASPlotterJSON
                 }
             }
         }
+
+        /// <summary>
+        /// Handles the "Copy Current Sprite" button click.
+        /// Serializes the currently selected sprite to JSON and copies it to the clipboard.
+        /// 
+        /// DATA FLOW:
+        /// Selected SpriteItem → Serialized to JSON → Clipboard
+        /// </summary>
+        private void CopySpriteJson_Click(object sender, RoutedEventArgs e)
+        {
+            // Make sure we have a selected sprite
+            if (_spriteCollection.SelectedItem != null)
+            {
+                try
+                {
+                    // DATA FLOW:
+                    // SpriteItem → JSON text
+                    // Using cached serialize options for consistent formatting
+                    string jsonContent = JsonSerializer.Serialize(_spriteCollection.SelectedItem, SerializeOptions);
+                    
+                    // Copy the JSON to the clipboard
+                    Clipboard.SetText(jsonContent);
+                    
+                    // Show success message with sprite name
+                    MessageBox.Show($"Copied sprite '{_spriteCollection.SelectedItem.Name}' to clipboard!", 
+                        "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    // ERROR HANDLING:
+                    // Show details about what went wrong during copying
+                    MessageBox.Show($"Error copying JSON to clipboard: {ex.Message}", 
+                        "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            else
+            {
+                MessageBox.Show("No sprite selected to copy.", 
+                    "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        /// <summary>
+        /// Handles the "Copy All Sprites" button click.
+        /// Serializes the entire sprite collection to JSON and copies it to the clipboard.
+        /// 
+        /// DATA FLOW:
+        /// SpriteItemCollection → Serialized to JSON → Clipboard
+        /// </summary>
+        private void CopyAllJson_Click(object sender, RoutedEventArgs e)
+        {
+            if (_spriteCollection.Items.Count > 0)
+            {
+                try
+                {
+                    // DATA FLOW:
+                    // SpriteItemCollection → JSON text
+                    // This includes ALL sprites and their properties
+                    // Using cached serialize options for consistent formatting
+                    string jsonContent = JsonSerializer.Serialize(_spriteCollection, SerializeOptions);
+                    
+                    // Copy the JSON to the clipboard
+                    Clipboard.SetText(jsonContent);
+                    
+                    // Show success message with sprite count
+                    MessageBox.Show($"Copied all {_spriteCollection.Items.Count} sprites to clipboard!", 
+                        "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    // ERROR HANDLING:
+                    // Show details about what went wrong during copying
+                    MessageBox.Show($"Error copying JSON to clipboard: {ex.Message}", 
+                        "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            else
+            {
+                MessageBox.Show("No sprites available to copy.", 
+                    "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
     }
 }

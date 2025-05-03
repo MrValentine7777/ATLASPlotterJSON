@@ -299,6 +299,10 @@
         
         <!-- Action Buttons -->
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="5">
+            <Button Content="Copy Current" ToolTip="Copy selected sprite to clipboard" 
+                    Margin="5" Padding="8,3" Click="CopySpriteJson_Click"/>
+            <Button Content="Copy All" ToolTip="Copy all sprites to clipboard" 
+                    Margin="5" Padding="8,3" Click="CopyAllJson_Click"/>
             <Button Content="Load JSON" Margin="5" Padding="8,3" Click="LoadJson_Click"/>
             <Button Content="Save JSON" Margin="5" Padding="8,3" Click="SaveJson_Click"/>
         </StackPanel>
