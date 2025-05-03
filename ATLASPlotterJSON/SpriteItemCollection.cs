@@ -115,8 +115,8 @@ namespace ATLASPlotterJSON
             if (Items.Contains(item))
             {
                 // Remove the item's assigned color from our tracking dictionary
-                if (_itemColors.ContainsKey(item.Id))
-                    _itemColors.Remove(item.Id);
+                // Using Remove directly instead of ContainsKey check + Remove
+                _itemColors.Remove(item.Id);
                 
                 // Remove the sprite from the collection
                 Items.Remove(item);
@@ -141,8 +141,9 @@ namespace ATLASPlotterJSON
         /// </remarks>
         public Color GetItemColor(int id)
         {
-            if (_itemColors.ContainsKey(id))
-                return _itemColors[id];
+            // Using TryGetValue instead of ContainsKey + indexer to avoid double dictionary lookup
+            if (_itemColors.TryGetValue(id, out Color color))
+                return color;
             
             return Colors.Red; // Default color if ID not found
         }
