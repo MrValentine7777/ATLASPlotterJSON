@@ -52,7 +52,7 @@ namespace ATLASPlotterJSON
         /// Dictionary mapping sprite IDs to their visual markers on the canvas
         /// This allows quick lookup of markers when sprites need to be updated
         /// </summary>
-        private readonly Dictionary<int, SpriteItemMarker> spriteMarkers = [];
+        internal readonly Dictionary<int, SpriteItemMarker> spriteMarkers = [];
 
         // PIXEL LOCATION TRACKING PROPERTIES
         /// <summary>
@@ -75,6 +75,11 @@ namespace ATLASPlotterJSON
         {
             WriteIndented = true
         };
+
+        /// <summary>
+        /// Zoom viewer component for detailed inspection
+        /// </summary>
+        private ZoomViewer? zoomViewer;
 
         /// <summary>
         /// Gets the loaded sprite atlas image
@@ -104,6 +109,14 @@ namespace ATLASPlotterJSON
 
             // Subscribe to the window size changed event
             SizeChanged += Window_SizeChanged;
+
+            // Initialize the zoom viewer
+            zoomViewer = new ZoomViewer(this);
+            imageCanvas.Children.Add(zoomViewer);
+            zoomViewer.Visibility = chkShowZoomViewer.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+
+            // Ensure the zoom viewer is on top of all other elements
+            Panel.SetZIndex(zoomViewer, 1000);
         }
 
         /// <summary>
@@ -723,6 +736,26 @@ namespace ATLASPlotterJSON
             foreach (var marker in spriteMarkers.Values)
             {
                 marker.UpdatePosition();
+            }
+        }
+
+        /// <summary>
+        /// Event handler for the "Show Zoom Viewer" checkbox
+        /// Toggles the visibility of the zoom viewer component
+        /// </summary>
+        private void chkShowZoomViewer_Click(object sender, RoutedEventArgs e)
+        {
+            if (zoomViewer != null)
+            {
+                // Show or hide the zoom viewer based on checkbox state
+                zoomViewer.Visibility = chkShowZoomViewer.IsChecked == false ? 
+                    Visibility.Collapsed : Visibility.Visible;
+                    
+                // Update the zoom viewer content if it's becoming visible
+                if (chkShowZoomViewer.IsChecked == true && loadedImage != null)
+                {
+                    zoomViewer.UpdateContent();
+                }
             }
         }
     }

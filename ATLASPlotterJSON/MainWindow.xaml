@@ -26,6 +26,7 @@
             <Button x:Name="btnSaveAtlas" Content="Save Atlas JSON" Padding="8,3" Margin="0,0,10,0" Click="btnSaveAtlas_Click" IsEnabled="False"/>
             <Button x:Name="btnClearSelections" Content="Clear All" Padding="8,3" Margin="0,0,10,0" Click="btnClearSelections_Click" IsEnabled="False"/>
             <Button x:Name="btnUpdateMarkers" Content="Update Markers" Padding="8,3" Margin="0,0,10,0" Click="btnUpdateMarkers_Click" IsEnabled="False"/>
+            <CheckBox x:Name="chkShowZoomViewer" Content="Show Zoom Viewer" Margin="10,0,0,0" IsChecked="False" Click="chkShowZoomViewer_Click" VerticalAlignment="Center"/>
         </StackPanel>
 
         <!-- Image Display Area -->

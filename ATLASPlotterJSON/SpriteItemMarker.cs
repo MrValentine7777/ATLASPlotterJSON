@@ -32,7 +32,9 @@ namespace ATLASPlotterJSON
         /// Gets the sprite item associated with this marker
         /// </summary>
         public SpriteItem SpriteItem => spriteItem;
-        
+
+        public Color MarkerColor { get; internal set; }
+
         /// <summary>
         /// Event that fires when the user selects this marker.
         /// The MainWindow subscribes to this event to know when a marker is selected.
