@@ -22,7 +22,7 @@ namespace ATLASPlotterJSON
         /// The collection of sprite items managed by this collection.
         /// Using ObservableCollection enables automatic UI updates when items are added or removed.
         /// </summary>
-        private ObservableCollection<SpriteItem> _items = new ObservableCollection<SpriteItem>();
+        private ObservableCollection<SpriteItem> _items = [];
         public ObservableCollection<SpriteItem> Items
         {
             get => _items;
@@ -54,12 +54,12 @@ namespace ATLASPlotterJSON
         /// Dictionary mapping sprite IDs to their assigned display colors.
         /// This ensures each sprite has a consistent color in the editor for visual identification.
         /// </summary>
-        private Dictionary<int, Color> _itemColors = new Dictionary<int, Color>();
+        private readonly Dictionary<int, Color> _itemColors = [];
         
         /// <summary>
         /// Random number generator used for assigning colors to sprites.
         /// </summary>
-        private Random _random = new Random();
+        private readonly Random _random = new Random();
 
         /// <summary>
         /// Event that fires when the selected sprite item changes.
@@ -202,10 +202,10 @@ namespace ATLASPlotterJSON
                 ShadowSource = new RectSource { X = 1, Y = 18, Width = 8, Height = 6 },
                 
                 // Default collision area for the sprite
-                Colliders = new ObservableCollection<Collider>
-                {
+                Colliders =
+                [
                     new Collider { Type = "rectangle", X = 4, Y = 4, Width = 8, Height = 8 }
-                },
+                ],
                 
                 // Animation data for when the sprite breaks
                 BreakingAnimation = new BreakingAnimation

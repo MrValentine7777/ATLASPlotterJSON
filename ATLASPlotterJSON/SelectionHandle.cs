@@ -45,14 +45,14 @@ namespace ATLASPlotterJSON
         private double originalHeight;     // Original height of the target rectangle
 
         // Reference to the parent window for status updates and coordinate conversion
-        private MainWindow parentWindow;
+        private readonly MainWindow parentWindow;
 
         // Size of the handle in screen space (will be scaled by zoom)
         // This determines the visual and clickable size of the handle
         private const double HandleSize = 8.0;
 
         // The visual representation of this handle (a small square at the corner)
-        private Rectangle visualRectangle;
+        private readonly Rectangle visualRectangle;
 
         /// <summary>
         /// Creates a new selection handle at the specified position for the target rectangle
@@ -148,7 +148,7 @@ namespace ATLASPlotterJSON
         /// </summary>
         /// <param name="position">The corner position of the handle</param>
         /// <returns>The appropriate cursor for the specified position</returns>
-        private Cursor GetCursorForPosition(HandlePosition position)
+        private static Cursor GetCursorForPosition(HandlePosition position)
         {
             // Return diagonal resize cursors based on the handle position
             // This provides a visual cue about the direction the selection will resize

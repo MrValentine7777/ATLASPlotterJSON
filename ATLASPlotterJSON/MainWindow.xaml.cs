@@ -43,7 +43,7 @@ namespace ATLASPlotterJSON
         private BitmapImage? loadedImage;
 
         /// <summary>Legacy collection for atlas items (mostly replaced by SpriteCollection)</summary>
-        private readonly List<AtlasItem> atlasItems = new();
+        private readonly List<AtlasItem> atlasItems = [];
 
         /// <summary>Path to the currently loaded image file</summary>
         private string? imagePath;
@@ -52,7 +52,7 @@ namespace ATLASPlotterJSON
         /// Dictionary mapping sprite IDs to their visual markers on the canvas
         /// This allows quick lookup of markers when sprites need to be updated
         /// </summary>
-        private Dictionary<int, SpriteItemMarker> spriteMarkers = new Dictionary<int, SpriteItemMarker>();
+        private readonly Dictionary<int, SpriteItemMarker> spriteMarkers = [];
 
         // PIXEL LOCATION TRACKING PROPERTIES
         /// <summary>
@@ -66,6 +66,15 @@ namespace ATLASPlotterJSON
 
         /// <summary>The current pixel location being tracked</summary>
         private Point currentPixelLocation;
+
+        /// <summary>
+        /// Cached JSON serializer options for saving JSON (serialization).
+        /// Configured to create nicely formatted, human-readable JSON files.
+        /// </summary>
+        private static readonly JsonSerializerOptions _serializeOptions = new JsonSerializerOptions
+        {
+            WriteIndented = true
+        };
 
         /// <summary>
         /// Gets the loaded sprite atlas image
@@ -510,14 +519,11 @@ namespace ATLASPlotterJSON
                 {
                     // DATA FLOW:
                     // Configure JSON serialization options (pretty-printed JSON)
-                    var options = new JsonSerializerOptions
-                    {
-                        WriteIndented = true
-                    };
-
+                    // Using cached serializer options instead of creating new ones
+                    
                     // COMPONENT CONNECTION:
                     // Serialize the entire sprite collection from JsonDataEntryControl
-                    string json = JsonSerializer.Serialize(jsonDataEntry.SpriteCollection, options);
+                    string json = JsonSerializer.Serialize(jsonDataEntry.SpriteCollection, _serializeOptions);
 
                     // Write the JSON to the selected file
                     File.WriteAllText(saveFileDialog.FileName, json);
@@ -694,6 +700,6 @@ namespace ATLASPlotterJSON
         public int ImageHeight { get; set; }
 
         /// <summary>Collection of sprite frames defined in the atlas</summary>
-        public List<AtlasItem> Frames { get; set; } = new List<AtlasItem>();
+        public List<AtlasItem> Frames { get; set; } = [];
     }
 }

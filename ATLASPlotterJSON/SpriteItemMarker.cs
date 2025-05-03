@@ -205,7 +205,7 @@ namespace ATLASPlotterJSON
             {
                 // Selected sprite has thicker, dashed border and bolder text
                 sourceBox.StrokeThickness = 3;
-                sourceBox.StrokeDashArray = new DoubleCollection { 4, 2 };  // Dashed line pattern
+                sourceBox.StrokeDashArray = [4, 2];  // Dashed line pattern
                 label.FontWeight = FontWeights.ExtraBold;                   // Extra bold text
             }
             else

@@ -133,7 +133,7 @@ namespace ATLASPlotterJSON
         /// These define which parts of the sprite can interact with other game elements.
         /// For example, a tree might have a smaller collision area than its visual appearance.
         /// </summary>
-        private ObservableCollection<Collider> _colliders = new();
+        private ObservableCollection<Collider> _colliders = [];
         public ObservableCollection<Collider> Colliders
         {
             get => _colliders;

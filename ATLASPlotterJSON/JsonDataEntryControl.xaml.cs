@@ -33,6 +33,25 @@ namespace ATLASPlotterJSON
     public partial class JsonDataEntryControl : UserControl
     {
         /// <summary>
+        /// Cached JSON serializer options for loading JSON (deserialization).
+        /// Configured to be case-insensitive for more flexible JSON parsing.
+        /// </summary>
+        private static readonly JsonSerializerOptions _deserializeOptions = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+        /// <summary>
+        /// Cached JSON serializer options for saving JSON (serialization).
+        /// Configured to create nicely formatted, human-readable JSON files.
+        /// Static and public so it can be shared with MainWindow.
+        /// </summary>
+        public static readonly JsonSerializerOptions SerializeOptions = new JsonSerializerOptions
+        {
+            WriteIndented = true
+        };
+
+        /// <summary>
         /// The collection that holds all sprite items in the project.
         /// This is the central data store that maintains the list of sprites and their properties.
         /// The SpriteItemCollection handles sprite creation, selection, color assignment, etc.
@@ -262,13 +281,6 @@ namespace ATLASPlotterJSON
                     // Read the entire JSON file as text
                     string jsonContent = File.ReadAllText(openFileDialog.FileName);
                     
-                    // Configure JSON deserialization options
-                    // PropertyNameCaseInsensitive allows for flexibility in JSON property names
-                    var options = new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    };
-                    
                     // DECISION POINT:
                     // Determine whether this is a collection or a single sprite
                     // by checking for the "Items" property in the JSON
@@ -277,7 +289,8 @@ namespace ATLASPlotterJSON
                         // SCENARIO 1: Loading a full collection
                         // DATA FLOW: 
                         // JSON text → SpriteItemCollection object
-                        SpriteItemCollection? loadedCollection = JsonSerializer.Deserialize<SpriteItemCollection>(jsonContent, options);
+                        // Using cached deserialize options instead of creating new ones
+                        SpriteItemCollection? loadedCollection = JsonSerializer.Deserialize<SpriteItemCollection>(jsonContent, _deserializeOptions);
                         
                         if (loadedCollection != null)
                         {
@@ -305,7 +318,8 @@ namespace ATLASPlotterJSON
                         // SCENARIO 2: Loading a single sprite
                         // DATA FLOW:
                         // JSON text → SpriteItem object
-                        SpriteItem? loadedItem = JsonSerializer.Deserialize<SpriteItem>(jsonContent, options);
+                        // Using cached deserialize options instead of creating new ones
+                        SpriteItem? loadedItem = JsonSerializer.Deserialize<SpriteItem>(jsonContent, _deserializeOptions);
                         
                         if (loadedItem != null)
                         {
@@ -364,17 +378,11 @@ namespace ATLASPlotterJSON
             {
                 try
                 {
-                    // Configure JSON serialization options
-                    // WriteIndented creates nicely formatted JSON with line breaks and indentation
-                    var options = new JsonSerializerOptions
-                    {
-                        WriteIndented = true
-                    };
-                    
                     // DATA FLOW:
                     // SpriteItemCollection → JSON text
                     // This includes ALL sprites and their properties
-                    string jsonContent = JsonSerializer.Serialize(_spriteCollection, options);
+                    // Using cached serialize options instead of creating new ones
+                    string jsonContent = JsonSerializer.Serialize(_spriteCollection, SerializeOptions);
                     
                     // Write the JSON to the selected file
                     File.WriteAllText(saveFileDialog.FileName, jsonContent);
