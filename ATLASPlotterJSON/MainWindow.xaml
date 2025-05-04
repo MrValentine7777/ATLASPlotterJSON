@@ -48,7 +48,7 @@
         <Grid Grid.Row="0" Grid.Column="1" Grid.RowSpan="2">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*"/>
-                <RowDefinition Height="200" MinHeight="150"/>
+                <RowDefinition Height="200" MinHeight="250"/>
             </Grid.RowDefinitions>
             
             <!-- JSON Data Entry Panel -->
